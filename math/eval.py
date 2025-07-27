@@ -212,7 +212,7 @@ if __name__ == "__main__":
 
 
 
-def gsm8k_test_noargs(model, tokenizer, name, data_path='./dataset/GSM8K_test.jsonl', start=0, end=sys.maxsize, batch_size=200):
+def gsm8k_test_noargs(model, tokenizer, name, data_path='./dataset/GSM8K_test.jsonl', start=0, end=sys.maxsize, batch_size=100):
     INVALID_ANS = "[invalid]"
     gsm8k_ins = []
     gsm8k_answers = []
