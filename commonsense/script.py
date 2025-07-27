@@ -24,9 +24,8 @@ elif model == 'llama3':
     target_modules=["q_proj", "k_proj", "v_proj", "up_proj", "down_proj"]
 
 for seed in [1]:
-    for r, scale, ratio in [(16,8,0.25)]:
-        #os.system(f'CUDA_VISIBLE_DEVICES={gpu} python finetune.py --base_model {base_model} --data_path ./ft-training_set/{dataset}.json --output_dir ./trained_models/{model}_{dataset}_epoch{epoch}_lora_r{r}_scale{scale}_lr{lr}_seed{seed}/ --batch_size {bs} --micro_batch_size 16 --num_epochs {epoch}   --learning_rate {lr}   --cutoff_len 256   --val_set_size 0  --adapter_name lora --lora_r {r} --lora_alpha {scale * (r**0.5)}')
-        os.system(f'CUDA_VISIBLE_DEVICES={gpu} python finetune.py --base_model {base_model} --data_path ./ft-training_set/{dataset}.json --output_dir ./trained_models/{model}_{dataset}_epoch{epoch}_lora_r{r}_scale{scale}_lr{lr}_seed{seed}/ --batch_size {bs} --micro_batch_size 16 --num_epochs {epoch}   --learning_rate {lr}   --cutoff_len 256   --val_set_size 0  --adapter_name lora --lora_r {r} --lora_alpha {scale * (r**0.5)} --prepare_ratio {ratio} --target_modules \"{','.join(target_modules)}\"')
+    for r, scale, ratio, epoch in [(4,8,0,3),(4,4,0,3)]:
+        os.system(f'CUDA_VISIBLE_DEVICES={gpu} python finetune.py --base_model {base_model} --data_path ./ft-training_set/{dataset}.json --output_dir ./trained_models/{model}_{dataset}_lr{lr}_epoch{epoch}_r{r}_scale{scale}_ratio{ratio}_seed{seed}/ --batch_size {bs} --micro_batch_size 16 --num_epochs {epoch}   --learning_rate {lr}   --cutoff_len 256   --val_set_size 0  --adapter_name lora --lora_r {r} --lora_alpha {scale * (r**0.5)} --prepare_ratio {ratio} --target_modules \"{','.join(target_modules)}\"')
 
         if dataset == 'commonsense_170k':
             #evalsets = ["boolq", "piqa", "social_i_qa", "hellaswag", "winogrande", "ARC-Challenge", "ARC-Easy", "openbookqa"]
