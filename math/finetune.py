@@ -282,6 +282,7 @@ def train():
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
+        torch_dtype=torch.float16,
     ).to("cuda")
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
