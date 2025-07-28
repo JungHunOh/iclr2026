@@ -294,4 +294,7 @@ def extract_answer(dataset, sentence: str) -> float:
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    tokenizer, model = load_model(args)
+    name = args.lora_weights.split('/')[-1]
+    main(model, tokenizer, name)
