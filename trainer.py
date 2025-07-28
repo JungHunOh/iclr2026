@@ -91,8 +91,8 @@ class CustomAdamW(torch.optim.AdamW):
                         module.lora_A['default'].weight.data = v.clone().contiguous()
                         module.lora_B['default'].weight.data = u.clone().contiguous()
 
-                        module.lora_A_init = v.clone().contiguous()
-                        module.lora_B_init = u.clone().contiguous()
+                        #module.lora_A_init = v.clone().contiguous()
+                        #module.lora_B_init = u.clone().contiguous()
 
                         #module.scaling['default'] *= r/target_r / (r**0.5) * (target_r**0.5)
 
