@@ -28,6 +28,7 @@ from torch.utils.data import Dataset
 import argparse
 import json
 import random
+import numpy as np
 
 from peft import get_peft_model, TaskType, LoraConfig, VeraConfig, BOFTConfig
 from tqdm import tqdm
