@@ -27,7 +27,7 @@ from torch.utils.data import Dataset
 #from transformers import Trainer
 import argparse
 import json
-import random;random.seed(42)
+import random
 
 from peft import get_peft_model, TaskType, LoraConfig, VeraConfig, BOFTConfig
 from tqdm import tqdm
@@ -279,6 +279,11 @@ def train():
     model_args, data_args, training_args, lora_args, remaining_args = parser.parse_args_into_dataclasses(return_remaining_strings=True)
     data_args.data_length = int(remaining_args[1])
 
+    random.seed(training_args.seed)
+    np.random.seed(training_args.seed)
+    torch.manual_seed(training_args.seed)
+    torch.cuda.manual_seed(training_args.seed)
+
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
@@ -369,7 +374,8 @@ def train():
         replace_svft_with_fused_linear(model, get_target_modules_list(model, lora_args.target_modules))
 
     else:
-        model = model.merge_and_unload()
+        #model = model.merge_and_unload()
+        pass
 
     for param in model.parameters():
         param.data = param.data.contiguous()

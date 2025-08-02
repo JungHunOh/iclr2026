@@ -35,11 +35,17 @@ class CustomLoRATrainer(Trainer):
             }
             new_param_groups.append(group_copy)
         
+        mode = self.args.output_dir.split('_')[-2]
+        for module in self.model.modules():
+            if hasattr(module, 'lora_A'):
+                module.method = mode
+
         assert type(self.optimizer) is torch.optim.AdamW, "only support AdamW optimizer"
         self.optimizer = CustomAdamW(
             new_param_groups,
             target_iter=int(self.prepare_ratio * num_training_steps),
-            model=self.model
+            model=self.model,
+            mode=mode
         )
 
         if self.prepare_ratio > 0:
@@ -48,11 +54,12 @@ class CustomLoRATrainer(Trainer):
             self.create_scheduler(num_training_steps=num_training_steps, optimizer=self.optimizer)
 
 class CustomAdamW(torch.optim.AdamW):
-    def __init__(self, params, target_iter=0, model=None, **kwargs):
+    def __init__(self, params, target_iter=0, model=None, mode='base', **kwargs):
         super().__init__(params, **kwargs)
         self.model = model
         self._step_count = 0
         self.target_iter = target_iter
+        self.mode = mode
         if hasattr(self.model, 'classifier'):
             self.classifier_init = self.model.classifier.weight.clone()
 
@@ -66,6 +73,19 @@ class CustomAdamW(torch.optim.AdamW):
         loss = super().step(closure)
         
         self._step_count += 1
+
+        if self._step_count == 1 and 'svd' in self.mode:
+            self.state.clear()
+            if hasattr(self.model, 'classifier'):
+                self.model.classifier.weight.data = self.classifier_init
+                torch.nn.init.zeros_(self.model.classifier.bias)
+            for module in self.model.modules():
+                if hasattr(module, 'lora_A'):
+                    if "svd1" in self.mode:
+                        module.lora_A['default'].weight.data[0:1] = module.v.clone()
+                    elif "svdr" in self.mode:
+                        module.lora_A['default'].weight.data = module.v.clone()
+                    torch.nn.init.zeros_(module.lora_B['default'].weight)
 
         if self._step_count == self.target_iter and self.target_iter > 0:
             self.state.clear()
@@ -101,6 +121,7 @@ class CustomAdamW(torch.optim.AdamW):
                         #module.detach_lora = True
 
         #if self._step_count > self.target_iter and self.target_iter > 0:
+        #if self._step_count % 20 == 0:
         if False:
             for module in self.model.modules():
                 if hasattr(module, 'lora_A'):
@@ -112,19 +133,19 @@ class CustomAdamW(torch.optim.AdamW):
                         r = lora_A.shape[0]
 
                         ba = lora_B @ lora_A
-                        ba_init = module.lora_B_init @ module.lora_A_init
+                        #ba_init = module.lora_B_init @ module.lora_A_init
                         
-                        # if module.layer_idx % 13 == 0:
-                        #     u, s, v = torch.linalg.svd(ba-ba_init)
-                        #     s_norm = s / s.sum()
-                        #     entropy = -torch.sum(s_norm * torch.log(s_norm + 1e-12))
-                        #     effective_rank = torch.exp(entropy)
-                        #     print(f"Effective rank: {effective_rank.item():.4f}")
+                        if module.layer_idx % 13 == 0:
+                            u, s, v = torch.linalg.svd(ba)
+                            s_norm = s / s.sum()
+                            entropy = -torch.sum(s_norm * torch.log(s_norm + 1e-12))
+                            effective_rank = torch.exp(entropy)
+                            print(f"Effective rank: {effective_rank.item():.4f}")
 
-                        module.base_layer.weight.data = W  + ((ba - ba_init)* scaling).to(W.dtype)
+                        #module.base_layer.weight.data = W  + ((ba - ba_init)* scaling).to(W.dtype)
 
-                        module.lora_A['default'].weight.data = module.lora_A_init.clone()
-                        module.lora_B['default'].weight.data = module.lora_B_init.clone()
+                        #module.lora_A['default'].weight.data = module.lora_A_init.clone()
+                        #module.lora_B['default'].weight.data = module.lora_B_init.clone()
 
                         #module.lora_A_init = lora_A.clone()
                         #module.lora_B_init = lora_B.clone()
