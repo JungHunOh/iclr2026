@@ -16,13 +16,13 @@ elif model == 'llama':
 elif model == 'llama3':
     base_model = 'meta-llama/Meta-Llama-3-8B'
 
-bs=32
+bs=64
 
 lr = 1e-4
 init='True'
 for seed in [1,2,3]:
-    for r, ratio, scale, epoch in [(16,0,4,3)]:
-        for method in ['basesvd1']:
+    for r, ratio, scale, epoch in [(4,0,4,2),(4,0,8,2)]:
+        for method in ['base','ours','ourssvd1']:
             alpha = int(scale * (r**0.5))
             os.system(f'CUDA_VISIBLE_DEVICES={gpu} python finetune.py \
                 --model_name_or_path {base_model}\

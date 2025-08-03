@@ -81,10 +81,16 @@ class CustomAdamW(torch.optim.AdamW):
                 torch.nn.init.zeros_(self.model.classifier.bias)
             for module in self.model.modules():
                 if hasattr(module, 'lora_A'):
-                    if "svd1" in self.mode:
-                        module.lora_A['default'].weight.data[0:1] = module.v.clone()
-                    elif "svdr" in self.mode:
-                        module.lora_A['default'].weight.data = module.v.clone()
+                    with torch.no_grad():
+                        module.inputs = torch.cat(module.inputs, dim=0).cuda()
+                        if "svd1" in self.mode:
+                            _, _, v = torch.svd_lowrank(module.inputs, q=1, niter=4)
+                            module.lora_A['default'].weight.data[0:1] = v.T.detach().clone()
+                        elif "svdr" in self.mode:
+                            _, _, v = torch.svd_lowrank(module.inputs, q=module.lora_A['default'].weight.shape[0], niter=4)
+                            module.lora_A['default'].weight.data = v.T.detach().clone()
+                    del module.inputs
+                    module.svd_init = True
                     torch.nn.init.zeros_(module.lora_B['default'].weight)
 
         if self._step_count == self.target_iter and self.target_iter > 0:
