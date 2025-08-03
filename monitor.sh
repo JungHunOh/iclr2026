@@ -1,34 +1,26 @@
-# The username to monitor
-TARGET_USER="stella"
 
-# The PIDs to kill directly
-PROCESS_NAME1="681303"
-PROCESS_NAME2="681052"
-
-echo "Monitoring logins for user: $TARGET_USER..."
-echo "process names: $PROCESS_NAME1, $PROCESS_NAME2"
-
-gpus_to_kill="0 1"
+target_user="stella"  # The user to wait for
+kill_user="dh6dh"               # The user whose python processes you want to kill
 
 while true; do
-    # Check if the target user is logged in
-    if who | awk '{print $1}' | grep -q "^$TARGET_USER$"; then
-        echo "$TARGET_USER has logged in. Killing all GPU processes run by user dh6dh..."
-        # Get all PIDs of GPU processes run by dh6dh
-        dh6dh_pids=$(nvidia-smi --query-compute-apps=pid,process_name --format=csv,noheader | awk -F',' '{print $1}' | xargs -r ps -u dh6dh -o pid= | awk '{print $1}')
-        for PID in $dh6dh_pids; do
-            if [ -n "$PID" ]; then
-                echo "Killing GPU process PID $PID run by dh6dh"
-                kill -9 "$PID"
-            fi
-        done
+    echo "Waiting for $target_user to log in..."
+    pids=$(ps -u "$kill_user" -o pid=,comm= | awk '$2 ~ /^python/ {print $1}')
+    echo "Current Processes are $pids"
+    if who | grep -q "^$target_user\b"; then
+        echo "$target_user has logged in. Killing all python processes of $kill_user..."
+
+        if [ -z "$pids" ]; then
+            echo "No python processes found for user $kill_user."
+        else
+            for pid in $pids; do
+                echo "Killing python process $pid"
+                kill -9 "$pid"
+            done
+            echo "All python processes of $kill_user killed."
+        fi
+
+        break  # exit after killing
     fi
-    # Wait for a short interval before checking again
-    sleep 2
-done
 
-
-while true; do
-    echo "!!!StopStopStopStopStopStopStopStopStopStopStopStopStopStopStopStopStopStopStopStopStopStop!!!"
-    sleep 0.1
+    sleep 2  # check every 10 seconds
 done
