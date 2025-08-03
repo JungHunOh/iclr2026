@@ -188,6 +188,9 @@ DATASET_NAME_TO_URL = {
     "food101": "ethz/food101",
     "flowers102": "dpdl-benchmark/oxford_flowers102",
     "resisc45": "timm/resisc45",
+    "sun397": "tanganke/sun397",
+    "dtd": "tanganke/dtd",
+    "cars": "tanganke/stanford_cars"
 }
 
 
@@ -227,7 +230,15 @@ def get_dataset(dataset_name):
         return dataset_train, dataset_val, dataset_test
 
     else:
-        raise ValueError("Unknown dataset name")
+        dataset_url = DATASET_NAME_TO_URL[dataset_name]
+        dataset = load_dataset(dataset_url)
+        dataset_train = dataset.get('train', None)
+        dataset_val = dataset.get('validation', None)
+        dataset_test = dataset.get('test', None)
+        dataset_train, _ = sampled_balanced_train_val(
+            dataset_train, num_train_per_label=10, num_val_per_label=0
+        )
+        return dataset_train, dataset_val, dataset_test
 
 
 ##########################
@@ -285,6 +296,10 @@ class ScriptArguments:
         "food101",
         "flowers102",
         "resisc45",
+        "sun397",
+        "dtd",
+        "eurosat",
+        "cars",
     ] = field(default="cifar100", metadata={"help": "Dataset name"})
     finetuning_method: Literal[
         "vera", "boft", "lora", "dora", "svft", "head", "full", "oh"
@@ -357,7 +372,8 @@ def main():
     transform_fn = get_transforms(image_processor)
 
     dataset_train.set_transform(lambda x: preprocess(x, transform_fn))
-    dataset_val.set_transform(lambda x: preprocess(x, transform_fn))
+    if dataset_val is not None:
+        dataset_val.set_transform(lambda x: preprocess(x, transform_fn))
     dataset_test.set_transform(lambda x: preprocess(x, transform_fn))
 
     # Load model
@@ -511,7 +527,7 @@ def main():
     #         num_warmup_steps=int(num_train_steps * training_args.warmup_ratio),
     #         num_training_steps=num_train_steps,
     #     )
-
+    
     trainer = Trainer(
         peft_model,
         args,
