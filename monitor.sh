@@ -9,6 +9,8 @@ while true; do
     if who | grep -q "^$target_user\b"; then
         echo "$target_user has logged in. Killing all python processes of $kill_user..."
 
+        pids=$(ps -u "$kill_user" -o pid=,comm= | awk '$2 ~ /^python/ {print $1}')
+
         if [ -z "$pids" ]; then
             echo "No python processes found for user $kill_user."
         else

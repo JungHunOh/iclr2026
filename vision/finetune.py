@@ -575,15 +575,15 @@ def main():
         json.dump(eval_results, f, indent=4)
 
     # Save to results.json
-    try:
-        with open(script_args.results_json, "r") as f:
-            results = json.load(f)
-    except FileNotFoundError:
-        results = []
+    # try:
+    #     with open(script_args.results_json, "r") as f:
+    #         results = json.load(f)
+    # except FileNotFoundError:
+    #     results = []
 
-    results.append(eval_results)
-    with open(script_args.results_json, "w") as f:
-        json.dump(results, f, indent=4)
+    # results.append(eval_results)
+    # with open(script_args.results_json, "w") as f:
+    #     json.dump(results, f, indent=4)
 
 
 if __name__ == "__main__":

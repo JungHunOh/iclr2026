@@ -29,7 +29,7 @@ for seed in [1,2,3]:
             alpha = int(scale * (r**0.5))
             os.system(f'CUDA_VISIBLE_DEVICES={gpu} python train_math.py \
                 --model_name_or_path {base_model}\
-                --data_path ft-training_set/MetaMathQA-395K.json \
+                --data_path ft-training_set/MetaMathQA-40K.json \
                 --data_length 10000000 \
                 --bf16 True \
                 --output_dir ./trained_models/{model}_metamath_epoch{epoch}_r{r}_scale{scale}_lr{lr}_ratio{ratio}_{method}_seed{seed}/\
