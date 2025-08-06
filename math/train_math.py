@@ -326,6 +326,12 @@ def train():
     trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, prepare_ratio=lora_args.prepare_ratio, **data_module)
 
     trainer.train()
+
+    if training_args.max_steps > 0:
+        training_args.max_steps = -1
+        trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, prepare_ratio=lora_args.prepare_ratio, **data_module)
+        trainer.train()
+        
     trainer.save_state()
     # if os.environ.get('LOCAL_RANK') == '0':
     for param in model.parameters():

@@ -35,7 +35,8 @@ class CustomLoRATrainer(Trainer):
             }
             new_param_groups.append(group_copy)
         
-        mode = self.args.output_dir.split('_')[-2]
+        mode = self.args.output_dir.split('_')[-1].replace('/','')
+        #mode = self.args.output_dir.split('_')[-2]
         for module in self.model.modules():
             if hasattr(module, 'lora_A'):
                 module.method = mode
@@ -45,7 +46,8 @@ class CustomLoRATrainer(Trainer):
             new_param_groups,
             target_iter=int(self.prepare_ratio * num_training_steps),
             model=self.model,
-            mode=mode
+            mode=mode,
+            before_init=self.args.max_steps > 0
         )
 
         if self.prepare_ratio > 0:
@@ -54,12 +56,13 @@ class CustomLoRATrainer(Trainer):
             self.create_scheduler(num_training_steps=num_training_steps, optimizer=self.optimizer)
 
 class CustomAdamW(torch.optim.AdamW):
-    def __init__(self, params, target_iter=0, model=None, mode='base', **kwargs):
+    def __init__(self, params, target_iter=0, model=None, mode='base', before_init=False, **kwargs):
         super().__init__(params, **kwargs)
         self.model = model
         self._step_count = 0
         self.target_iter = target_iter
         self.mode = mode
+        self.before_init = before_init
         if hasattr(self.model, 'classifier'):
             self.classifier_init = self.model.classifier.weight.clone()
 
@@ -68,13 +71,40 @@ class CustomAdamW(torch.optim.AdamW):
             if hasattr(module, 'lora_A'):
                 module.layer_idx=layer
                 layer += 1
+                module.iter = 0
+                if not self.before_init:
+                    with torch.no_grad():
+                        module.inputs = torch.cat(module.inputs, dim=0).cuda()
+                        if "svd1" in self.mode:
+                            _, _, v = torch.svd_lowrank(module.inputs, q=1, niter=4)
+                            module.lora_A['default'].weight.data[0:1] = v.T.detach().clone()
+                        elif "svdr" in self.mode:
+                            _, _, v = torch.svd_lowrank(module.inputs, q=module.lora_A['default'].weight.shape[0], niter=4)
+                            module.lora_A['default'].weight.data = v.T.detach().clone()
+                    del module.inputs
+                    module.svd_init = True
+                    torch.nn.init.zeros_(module.lora_B['default'].weight)
 
     def step(self, closure=None):
         loss = super().step(closure)
-        
+
+        if self.before_init:
+            self.state.clear()
+            if hasattr(self.model, 'classifier'):
+                self.model.classifier.weight.data = self.classifier_init
+                torch.nn.init.zeros_(self.model.classifier.bias)
+            for module in self.model.modules():
+                if hasattr(module, 'lora_A'):
+                    torch.nn.init.zeros_(module.lora_B['default'].weight)
+                    
         self._step_count += 1
 
-        if self._step_count == 1 and 'svd' in self.mode:
+        for module in self.model.modules():
+            if hasattr(module, 'lora_A'):
+                module.iter += 1
+        '''
+        #if self._step_count == 1 and 'svd' in self.mode and not self.before_init:
+        if False:
             self.state.clear()
             if hasattr(self.model, 'classifier'):
                 self.model.classifier.weight.data = self.classifier_init
@@ -125,56 +155,7 @@ class CustomAdamW(torch.optim.AdamW):
                         module.base_layer.weight.data = W - (module.lora_B['default'].weight @ module.lora_A['default'].weight * module.scaling['default']).to(W.dtype)
 
                         #module.detach_lora = True
-
-        #if self._step_count > self.target_iter and self.target_iter > 0:
-        #if self._step_count % 20 == 0:
-        if False:
-            for module in self.model.modules():
-                if hasattr(module, 'lora_A'):
-                    with torch.no_grad():
-                        W = module.base_layer.weight
-                        lora_A = module.lora_A['default'].weight
-                        lora_B = module.lora_B['default'].weight
-                        scaling = module.scaling['default']
-                        r = lora_A.shape[0]
-
-                        ba = lora_B @ lora_A
-                        #ba_init = module.lora_B_init @ module.lora_A_init
-                        
-                        if module.layer_idx % 13 == 0:
-                            u, s, v = torch.linalg.svd(ba)
-                            s_norm = s / s.sum()
-                            entropy = -torch.sum(s_norm * torch.log(s_norm + 1e-12))
-                            effective_rank = torch.exp(entropy)
-                            print(f"Effective rank: {effective_rank.item():.4f}")
-
-                        #module.base_layer.weight.data = W  + ((ba - ba_init)* scaling).to(W.dtype)
-
-                        #module.lora_A['default'].weight.data = module.lora_A_init.clone()
-                        #module.lora_B['default'].weight.data = module.lora_B_init.clone()
-
-                        #module.lora_A_init = lora_A.clone()
-                        #module.lora_B_init = lora_B.clone()
-
-
-
-        #if self._step_count % 50 == 0 and self._step_count > self.target_iter:
-        if False:
-            for module in self.model.modules():
-                if hasattr(module, 'lora_A'):
-                    W = module.base_layer.weight
-                    lora_A = module.lora_A['default'].weight
-                    lora_B = module.lora_B['default'].weight
-                    scaling = module.scaling['default']
-                    r = lora_A.shape[0]
-
-                    if module.layer_idx % 19 == 0:
-                        u, s, v = torch.linalg.svd(lora_B @ lora_A)
-                        s_norm = s / s.sum()
-                        entropy = -torch.sum(s_norm * torch.log(s_norm + 1e-12))
-                        effective_rank = torch.exp(entropy)
-                        print(f"Effective rank: {effective_rank.item():.4f}")
-
+        '''
         return loss
 
 import torch
