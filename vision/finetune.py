@@ -527,22 +527,23 @@ def main():
     #         num_training_steps=num_train_steps,
     #     )
 
-    num_cls = len(label2id)
-    training_args.max_steps = num_cls * 10 // (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps)
-    args = TrainingArguments(**training_args.to_dict())
+    if 'svd' in training_args.output_dir:
+        num_cls = len(label2id)
+        training_args.max_steps = num_cls * 10 // (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps)
+        args = TrainingArguments(**training_args.to_dict())
 
-    trainer = Trainer(
-        peft_model,
-        args,
-        train_dataset=dataset_train,
-        eval_dataset=dataset_val,
-        tokenizer=image_processor,
-        compute_metrics=compute_metrics,
-        data_collator=collate_fn,
-        prepare_ratio=script_args.prepare_ratio,
-    )
+        trainer = Trainer(
+            peft_model,
+            args,
+            train_dataset=dataset_train,
+            eval_dataset=dataset_val,
+            tokenizer=image_processor,
+            compute_metrics=compute_metrics,
+            data_collator=collate_fn,
+            prepare_ratio=script_args.prepare_ratio,
+        )
 
-    train_results = trainer.train()
+        train_results = trainer.train()
 
     training_args.max_steps = -1
     args = TrainingArguments(**training_args.to_dict())

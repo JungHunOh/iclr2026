@@ -328,6 +328,7 @@ def train():
     trainer.train()
 
     if training_args.max_steps > 0:
+        assert 'svd' in training_args.output_dir
         training_args.max_steps = -1
         trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, prepare_ratio=lora_args.prepare_ratio, **data_module)
         trainer.train()
