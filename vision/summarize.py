@@ -3,12 +3,12 @@ import json
 import glob
 
 for dataset in ['resisc45','dtd','cars','cifar100','flowers102','food101','sun397']:
-#for dataset in ['sun397']:    
+#for dataset in ['cifar100']:
     model='vit-base'
-    methods = ['base','ours','ourssvd1','ourssvdr','basesvd1']
-    #methods = ['ourssvd1','ourssvdr','ourssvd1v2','ourssvdrv2']
+    #methods = ['base','ours','ourssvd1','ourssvdr','basesvd1']
+    methods = ['base','ours']
 
-    rs = [4,16,32]
+    rs = [8,32,64,128,256]
 
     dirs = []
     results = {}
@@ -24,13 +24,18 @@ for dataset in ['resisc45','dtd','cars','cifar100','flowers102','food101','sun39
         for r in rs:
             results[method]['r'+str(r)] = {}
             for i in range(8):
-                results[method]['r'+str(r)][f'scale{2+4*i}'] = []
+                if dataset == 'cifar100' or dataset == 'food101' or dataset == 'sun397' or dataset == 'dtd':
+                    scale = round((2+4*i) * 0.2,1)
+                else:
+                    scale = 2+4*i
+                results[method]['r'+str(r)][f'scale{scale}'] = []
 
     for dir in sorted(dirs):
         try:
             split = dir.split('_')
             scale, r, method = split[-3:]
             scale = scale.replace('alpha','scale')
+
         except:
             continue
 
@@ -47,7 +52,7 @@ for dataset in ['resisc45','dtd','cars','cifar100','flowers102','food101','sun39
     import matplotlib.pyplot as plt
 
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b','#e377c2','#7f7f7f','#bcbd22']
-    colors = {'base': colors[0], 'ours': colors[1], 'ourssvd1': colors[2], 'basesvd1': colors[3], 'ourssvdr': colors[4], 'ourssvd1v2': colors[5], 'ourssvdrv2': colors[6]}
+    colors = {'base': colors[0], 'ours': colors[1], 'ourssvd1': colors[2], 'basesvd1': colors[3], 'ourssvdr': colors[4], 'ourssvd1v3': colors[5], 'ourssvdrv3': colors[6]}
 
 
     for rank in rs:

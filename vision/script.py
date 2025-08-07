@@ -7,7 +7,8 @@ ii = int(cuda_visible_devices)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = cuda_visible_devices
 
-for dataset in ['resisc45', 'dtd', 'cars','cifar100', 'food101', 'flowers102', 'sun397']:
+for dataset in ['resisc45', 'cifar100', 'food101', 'dtd', 'cars', 'sun397']:
+#for dataset in ['resisc45']:
     bs = 32
     model='vit-base'
     lr = 2e-3
@@ -26,12 +27,12 @@ for dataset in ['resisc45', 'dtd', 'cars','cifar100', 'food101', 'flowers102', '
         ratio = 1-20/epoch
 
     for seed in [1,2,3,4,5]:
-        for mode in ['base','basesvd1','ours','ourssvd1','ourssvdr']:
+        for mode in ['base','ours']:
         #for mode in ['base']:
-            for r in [4,16,32]:
+            for r in [8,32,64,128,256]:
                 for scale in [2+4*ii]:
-                    if dataset == 'cifar100' or dataset == 'food101' or dataset == 'sun397':
-                        scale = scale * 0.1
+                    if dataset == 'cifar100' or dataset == 'food101' or dataset == 'sun397' or dataset == 'dtd':
+                        scale = round(scale * 0.2,1)
                     alpha = int(math.sqrt(r) * scale)
                     if method == 'lora':
                         output_dir = f"./experiment/{dataset}/{model}_lora_epoch{epoch}_bs{bs}_init{init}_lr{lr}_alpha{scale}_r{r}_{mode}/"

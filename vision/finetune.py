@@ -529,7 +529,7 @@ def main():
 
     if 'svd' in training_args.output_dir:
         num_cls = len(label2id)
-        training_args.max_steps = num_cls * 10 // (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps)
+        training_args.max_steps = (num_cls * 10 // (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps))//2
         args = TrainingArguments(**training_args.to_dict())
 
         trainer = Trainer(
