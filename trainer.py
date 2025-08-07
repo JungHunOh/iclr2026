@@ -35,8 +35,8 @@ class CustomLoRATrainer(Trainer):
             }
             new_param_groups.append(group_copy)
         
-        mode = self.args.output_dir.split('_')[-1].replace('/','')
-        #mode = self.args.output_dir.split('_')[-2]
+        #mode = self.args.output_dir.split('_')[-1].replace('/','')
+        mode = self.args.output_dir.split('_')[-2]
         for module in self.model.modules():
             if hasattr(module, 'lora_A'):
                 module.method = mode
@@ -72,7 +72,7 @@ class CustomAdamW(torch.optim.AdamW):
                 module.layer_idx=layer
                 layer += 1
                 module.iter = 0
-                if not self.before_init:
+                if not self.before_init and 'svd' in self.mode:
                     with torch.no_grad():
                         module.inputs = torch.cat(module.inputs, dim=0).cuda()
                         if "svd1" in self.mode:
