@@ -72,6 +72,7 @@ class CustomAdamW(torch.optim.AdamW):
                 module.layer_idx=layer
                 layer += 1
                 module.iter = 0
+                module.first_micro_batch = True
                 if not self.before_init and 'svd' in self.mode:
                     with torch.no_grad():
                         module.inputs = torch.cat(module.inputs, dim=0).cuda()
@@ -102,6 +103,7 @@ class CustomAdamW(torch.optim.AdamW):
         for module in self.model.modules():
             if hasattr(module, 'lora_A'):
                 module.iter += 1
+                module.first_micro_batch = True
         '''
         #if self._step_count == 1 and 'svd' in self.mode and not self.before_init:
         if False:
