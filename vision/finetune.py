@@ -198,22 +198,22 @@ def get_dataset(dataset_name):
     if dataset_name == "cifar100":
         dataset_url = DATASET_NAME_TO_URL[dataset_name]
 
-        dataset = load_dataset(dataset_url, split="train")
-        dataset = dataset.rename_column("fine_label", label_key)
-        dataset = dataset.rename_column("img", image_path_key)
+        dataset_train = load_dataset(dataset_url, split="train")
+        dataset_train = dataset_train.rename_column("fine_label", label_key)
+        dataset_train = dataset_train.rename_column("img", image_path_key)
 
         dataset_test = load_dataset(dataset_url, split="test")
         dataset_test = dataset_test.rename_column("fine_label", label_key)
         dataset_test = dataset_test.rename_column("img", image_path_key)
-        dataset_train, dataset_val = sampled_balanced_train_val(dataset)
+        #dataset_train, dataset_val = sampled_balanced_train_val(dataset)
 
         return dataset_train, dataset_val, dataset_test
 
     elif dataset_name == "food101":
         dataset_url = DATASET_NAME_TO_URL[dataset_name]
-        dataset = load_dataset(dataset_url, split="train")
+        dataset_train = load_dataset(dataset_url, split="train")
         dataset_test = load_dataset(dataset_url, split="validation")
-        dataset_train, dataset_val = sampled_balanced_train_val(dataset)
+        #dataset_train, dataset_val = sampled_balanced_train_val(dataset)
         return dataset_train, dataset_val, dataset_test
 
     elif dataset_name in {"flowers102", "resisc45"}:
@@ -221,12 +221,12 @@ def get_dataset(dataset_name):
         dataset_train = load_dataset(dataset_url, split="train")
         dataset_val = load_dataset(dataset_url, split="validation")
         dataset_test = load_dataset(dataset_url, split="test")
-        dataset_train, _ = sampled_balanced_train_val(
-            dataset_train, num_train_per_label=10, num_val_per_label=0
-        )
-        _, dataset_val = sampled_balanced_train_val(
-            dataset_val, num_train_per_label=0, num_val_per_label=2
-        )
+        #dataset_train, _ = sampled_balanced_train_val(
+        #    dataset_train, num_train_per_label=10, num_val_per_label=0
+        #)
+        #_, dataset_val = sampled_balanced_train_val(
+        #    dataset_val, num_train_per_label=0, num_val_per_label=2
+        #)
         return dataset_train, dataset_val, dataset_test
 
     else:
@@ -235,9 +235,9 @@ def get_dataset(dataset_name):
         dataset_train = dataset.get('train', None)
         dataset_val = dataset.get('validation', None)
         dataset_test = dataset.get('test', None)
-        dataset_train, _ = sampled_balanced_train_val(
-            dataset_train, num_train_per_label=10, num_val_per_label=0
-        )
+        #dataset_train, _ = sampled_balanced_train_val(
+        #    dataset_train, num_train_per_label=10, num_val_per_label=0
+        #)
         return dataset_train, dataset_val, dataset_test
 
 
@@ -344,7 +344,7 @@ class ScriptArguments:
         },
     )
 
-    lora_alpha: int = field(
+    lora_alpha: float = field(
         default=8, metadata={"help": "Lora alpha for LoRA or DoRA"}
     )
 

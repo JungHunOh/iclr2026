@@ -1,17 +1,19 @@
 import os
 import math
 
+#os.environ["NCCL_P2P_DISABLE"] = "1"
+#os.environ["NCCL_IB_DISABLE"] = "1"
+
 cuda_visible_devices = input()  # Set your desired GPU index here
 
 ii = int(cuda_visible_devices)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = cuda_visible_devices
 
-for dataset in ['resisc45', 'cifar100', 'food101', 'dtd', 'cars', 'sun397']:
-#for dataset in ['resisc45']:
-    bs = 32
+for dataset in ['resisc45','dtd','cifar100','food101','sun397','cars']:
+    bs = 128
     model='vit-base'
-    lr = 2e-3
+    lr = 1e-4
 
     method='lora'
     #method='oh'
@@ -19,21 +21,24 @@ for dataset in ['resisc45', 'cifar100', 'food101', 'dtd', 'cars', 'sun397']:
     init='True'
     #init='pissa_niter_4'
 
-    epoch = 20
+    epoch = 10
 
-    if method == 'lora':
-        ratio = 0
-    else:
-        ratio = 1-20/epoch
+    #ratio = 1-20/25
+    ratio = 0
 
-    for seed in [1,2,3,4,5]:
-        for mode in ['base','ours']:
+    for seed in [1,2,3]:
+        for mode in ['base', 'ours', 'oursdetach']:
         #for mode in ['base']:
-            for r in [8,32,64,128,256]:
-                for scale in [2+4*ii]:
-                    if dataset == 'cifar100' or dataset == 'food101' or dataset == 'sun397' or dataset == 'dtd':
-                        scale = round(scale * 0.2,1)
-                    alpha = int(math.sqrt(r) * scale)
+            for r in [4,32,64]:
+                for j in [ii]:
+                    if dataset == 'cifar100' or dataset == 'food101' or dataset == 'sun397':
+                        scale = round(0.2 + j * 0.1,1)
+                    elif dataset == 'resisc45' or dataset == 'cars':
+                        scale = 2 + j * 2
+                    elif dataset == 'dtd':
+                        scale = 1 + j * 1
+                    
+                    alpha = math.sqrt(r) * scale
                     if method == 'lora':
                         output_dir = f"./experiment/{dataset}/{model}_lora_epoch{epoch}_bs{bs}_init{init}_lr{lr}_alpha{scale}_r{r}_{mode}/"
                     elif method == 'oh':
