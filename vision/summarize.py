@@ -2,9 +2,9 @@ import os
 import json
 import glob
 
-for dataset in ['resisc45','cifar100','dtd']:
+for dataset in ['resisc45', 'cifar100', 'sun397', 'cars', 'dtd', 'cub200', 'food101']:
 #for dataset in ['cifar100']:
-    model='vit-base'
+    model='dino-v2-base'
     #methods = ['base','ours','ourssvd1','ourssvdr','basesvd1']
     methods = ['base','ours','oursdetach']
 
@@ -23,13 +23,8 @@ for dataset in ['resisc45','cifar100','dtd']:
     for method in methods:
         for r in rs:
             results[method]['r'+str(r)] = {}
-            for j in range(8):
-                if dataset == 'cifar100' or dataset == 'food101' or dataset == 'sun397':
-                    scale = round(0.2 + j * 0.1,1)
-                elif dataset == 'resisc45' or dataset == 'cars':
-                    scale = 2 + j * 2
-                elif dataset == 'dtd':
-                    scale = 1 + j * 1
+            for j in range(4):
+                scale = round(0.5 + j * 0.5,1)
                 results[method]['r'+str(r)][f'scale{scale}'] = []
                 scales.append(scale)
 

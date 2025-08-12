@@ -2,6 +2,7 @@ from transformers import Trainer
 import torch
 import math
 import random
+import wandb
 
 class CustomLoRATrainer(Trainer):
     def __init__(self, *args, **kwargs):
@@ -35,11 +36,14 @@ class CustomLoRATrainer(Trainer):
             }
             new_param_groups.append(group_copy)
         
-        #mode = self.args.output_dir.split('_')[-1].replace('/','')
-        mode = self.args.output_dir.split('_')[-2]
+        mode = self.args.output_dir.split('_')[-1].replace('/','')
+        #mode = self.args.output_dir.split('_')[-2]
         for module in self.model.modules():
             if hasattr(module, 'lora_A'):
                 module.method = mode
+        
+        if mode == 'base':
+            wandb.init(project='cossim', name=f'{self.args.output_dir.split("/")[3]}')
 
         assert type(self.optimizer) is torch.optim.AdamW, "only support AdamW optimizer"
         self.optimizer = CustomAdamW(
@@ -104,6 +108,33 @@ class CustomAdamW(torch.optim.AdamW):
             if hasattr(module, 'lora_A'):
                 module.iter += 1
                 module.first_micro_batch = True
+                if self.mode == 'oursnew' and (torch.norm(module.lora_B['default'].weight, dim=0) > 1e-2).all():
+                    with torch.no_grad():
+                        lora_A = module.lora_A['default'].weight
+                        lora_B = module.lora_B['default'].weight
+                        Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
+                        module.lora_A['default'].weight.data = (Q_A * torch.diag(R_A)).T.clone().contiguous()
+                        Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
+                        module.lora_B['default'].weight.data = (Q_B * torch.diag(R_B)).clone().contiguous()
+
+                # if self._step_count % 50 == 0 and (module.layer_idx % 12 == 0 or module.layer_idx % 15 == 0) and self.mode == 'base':
+                #     lora_A = module.lora_A['default'].weight
+                #     lora_B = module.lora_B['default'].weight
+                #     rank_1 = []
+                #     for i in range(lora_A.shape[0]):
+                #         rank_1.append((lora_B[:, i:i+1] @ lora_A[i:i+1]).reshape(-1))
+                #     rank_1 = torch.stack(rank_1, dim=0)
+                #     # Compute pairwise cosine similarity
+                #     normed = torch.nn.functional.normalize(rank_1, dim=1)
+                #     cosine_sim = normed @ normed.T
+                #     # Get top-5 values (excluding diagonal/self-similarity)
+                #     mask = ~torch.eye(cosine_sim.size(0), dtype=torch.bool, device=cosine_sim.device)
+                #     unique_vals = torch.unique(cosine_sim[mask])
+                #     top5_vals, _ = torch.topk(unique_vals, 5)
+                #     wandb.log({
+                #         f'cosine_sim_max_{module.layer_idx}': top5_vals.detach().cpu().numpy()[0],
+                #         f'cosine_sim_mean_{module.layer_idx}': unique_vals.mean().item()
+                #     })
         '''
         #if self._step_count == 1 and 'svd' in self.mode and not self.before_init:
         if False:

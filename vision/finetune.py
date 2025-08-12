@@ -190,7 +190,8 @@ DATASET_NAME_TO_URL = {
     "resisc45": "timm/resisc45",
     "sun397": "tanganke/sun397",
     "dtd": "tanganke/dtd",
-    "cars": "tanganke/stanford_cars"
+    "cars": "tanganke/stanford_cars",
+    "cub200": "cassiekang/cub200_dataset"
 }
 
 
@@ -207,14 +208,14 @@ def get_dataset(dataset_name):
         dataset_test = dataset_test.rename_column("img", image_path_key)
         #dataset_train, dataset_val = sampled_balanced_train_val(dataset)
 
-        return dataset_train, dataset_val, dataset_test
+        return dataset_train, None, dataset_test
 
     elif dataset_name == "food101":
         dataset_url = DATASET_NAME_TO_URL[dataset_name]
         dataset_train = load_dataset(dataset_url, split="train")
         dataset_test = load_dataset(dataset_url, split="validation")
         #dataset_train, dataset_val = sampled_balanced_train_val(dataset)
-        return dataset_train, dataset_val, dataset_test
+        return dataset_train, None, dataset_test
 
     elif dataset_name in {"flowers102", "resisc45"}:
         dataset_url = DATASET_NAME_TO_URL[dataset_name]
@@ -227,8 +228,22 @@ def get_dataset(dataset_name):
         #_, dataset_val = sampled_balanced_train_val(
         #    dataset_val, num_train_per_label=0, num_val_per_label=2
         #)
-        return dataset_train, dataset_val, dataset_test
+        return dataset_train, None, dataset_test
+    elif dataset_name in {"cub200"}:
+        dataset_url = DATASET_NAME_TO_URL[dataset_name]
 
+        dataset_train = load_dataset(dataset_url, split="train")
+        dataset_train = dataset_train.rename_column("text", label_key)
+        dataset_test = load_dataset(dataset_url, split="test")
+        dataset_test = dataset_test.rename_column("text", label_key)
+
+        labels = set(dataset_train[label_key])
+        from datasets import ClassLabel
+        label_feature = ClassLabel(names=list(labels))
+        dataset_train = dataset_train.cast_column(label_key, label_feature)
+        dataset_test = dataset_test.cast_column(label_key, label_feature)
+
+        return dataset_train, None, dataset_test
     else:
         dataset_url = DATASET_NAME_TO_URL[dataset_name]
         dataset = load_dataset(dataset_url)
@@ -238,7 +253,7 @@ def get_dataset(dataset_name):
         #dataset_train, _ = sampled_balanced_train_val(
         #    dataset_train, num_train_per_label=10, num_val_per_label=0
         #)
-        return dataset_train, dataset_val, dataset_test
+        return dataset_train, None, dataset_test
 
 
 ##########################
@@ -247,14 +262,14 @@ def get_dataset(dataset_name):
 
 
 MODEL_NAME_TO_URL = {
-    "dino-v2-large": "facebook/dinov2-large",
+    "dino-v2-base": "facebook/dinov2-base",
     "vit-base": "google/vit-base-patch16-224-in21k",
     "vit-large": "google/vit-large-patch16-224-in21k",
 }
 
 
 def get_target_modules(model_name, finetuning_method):
-    if model_name == "dino-v2-large":
+    if model_name == "dino-v2-base":
         if finetuning_method in {"vera", "svft"}:
             return [
                 "query",
@@ -275,7 +290,7 @@ def get_target_modules(model_name, finetuning_method):
 
 
 def get_classifier_modules(model_name):
-    if model_name in {"dino-v2-large", "vit-base", "vit-large"}:
+    if model_name in {"dino-v2-base", "vit-base", "vit-large"}:
         return [
             "classifier",
         ]
@@ -288,7 +303,7 @@ class ScriptArguments:
     results_json: str = field(
         default="results.json", metadata={"help": "Results json file"}
     )
-    model_name: Literal["dino-v2-large", "vit-base", "vit-large"] = field(
+    model_name: Literal["dino-v2-base", "vit-base", "vit-large"] = field(
         default="vit-base", metadata={"help": "Model name"}
     )
     dataset_name: Literal[
@@ -300,6 +315,7 @@ class ScriptArguments:
         "dtd",
         "eurosat",
         "cars",
+        "cub200",
     ] = field(default="cifar100", metadata={"help": "Dataset name"})
     finetuning_method: Literal[
         "vera", "boft", "lora", "dora", "svft", "head", "full", "oh"
