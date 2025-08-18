@@ -15,13 +15,13 @@ dataset = 'alpaca'
 ratio=0
 epoch = 3
 lr = 1e-3
-bs = 128
+bs = 64
 r = 32
 for scale in [0.5,1,2]:
     method = 'base'
     seed = 1
 
-    output_dir = f"./experiment/{dataset}/model{model}_epoch{epoch}_lr{lr}_r{r}_scale{scale}_{method}_seed{seed}"
+    output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_lr{lr}_r{r}_scale{scale}_{method}_seed{seed}"
 
     # Alpaca finetuning
     os.system(
