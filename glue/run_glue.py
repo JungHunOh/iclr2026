@@ -268,11 +268,11 @@ def main():
     transformers.utils.logging.enable_explicit_format()
 
     # Log on each process the small summary:
-    logger.warning(
-        f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}, "
-        + f"distributed training: {training_args.parallel_mode.value == 'distributed'}, 16-bits training: {training_args.fp16}"
-    )
-    logger.info(f"Training/evaluation parameters {training_args}")
+    # logger.warning(
+    #     f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}, "
+    #     + f"distributed training: {training_args.parallel_mode.value == 'distributed'}, 16-bits training: {training_args.fp16}"
+    # )
+    # logger.info(f"Training/evaluation parameters {training_args}")
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -340,7 +340,8 @@ def main():
                 raise ValueError("Need either a GLUE task or a test file for `do_predict`.")
 
         for key in data_files.keys():
-            logger.info(f"load a local file for {key}: {data_files[key]}")
+            #logger.info(f"load a local file for {key}: {data_files[key]}")
+            pass
 
         if data_args.train_file.endswith(".csv"):
             # Loading a dataset from local csv files
@@ -491,9 +492,10 @@ def main():
     def print_class_distribution(dataset, split_name):
         label_counts = Counter(dataset["label"])
         total = sum(label_counts.values())
-        logger.info(f"Class distribution in {split_name} set:")
+        #logger.info(f"Class distribution in {split_name} set:")
         for label, count in label_counts.items():
-            logger.info(f"  Label {label}: {count} ({count / total:.2%})")
+            pass
+            #logger.info(f"  Label {label}: {count} ({count / total:.2%})")
 
     if training_args.do_train:
         if "train" not in raw_datasets:
@@ -525,7 +527,8 @@ def main():
     # Log a few random samples from the training set:
     if training_args.do_train:
         for index in random.sample(range(len(train_dataset)), 3):
-            logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+            #logger.info(f"Sample {index} of the training set: {train_dataset[index]}.")
+            pass
 
     # Get the metric function
     if data_args.task_name is not None:
