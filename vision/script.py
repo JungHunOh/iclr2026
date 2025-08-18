@@ -49,9 +49,9 @@ for model in ['vit-base']:
                         
                         alpha = math.sqrt(r) * scale
                         if method == 'lora':
-                            output_dir = f"./experiment/{dataset}/{model}_lora_epoch{epoch}_bs{bs}_init{init}_lr{lr}_alpha{scale}_r{r}_{mode}/"
+                            output_dir = f"./experiment/{dataset}/{model}_lora_epoch{epoch}_bs{bs}_init{init}_lr{lr}_alpha{scale}_r{r}_{mode}_dummy/"
                         elif method == 'oh':
-                            output_dir = f"./experiment/{dataset}/{model}_lora_epoch{epoch}_bs{bs}_init{init}_lr{lr}_alpha{scale}_r{r}_{mode}/"
+                            output_dir = f"./experiment/{dataset}/{model}_lora_epoch{epoch}_bs{bs}_init{init}_lr{lr}_alpha{scale}_r{r}_{mode}_dummy/"
                         cmd = (
                             f"python finetune.py "
                             f"--eval_strategy no "
