@@ -2,7 +2,6 @@ from transformers import Trainer
 import torch
 import math
 import random
-import wandb
 
 class CustomLoRATrainer(Trainer):
     def __init__(self, *args, **kwargs):
@@ -36,14 +35,11 @@ class CustomLoRATrainer(Trainer):
             }
             new_param_groups.append(group_copy)
         
-        mode = self.args.output_dir.split('_')[-1].replace('/','')
-        #mode = self.args.output_dir.split('_')[-2]
+        #mode = self.args.output_dir.split('_')[-1].replace('/','')
+        mode = self.args.output_dir.split('_')[-2]
         for module in self.model.modules():
             if hasattr(module, 'lora_A'):
                 module.method = mode
-        
-        if mode == 'base':
-            wandb.init(project='cossim', name=f'{self.args.output_dir.split("/")[3]}')
 
         assert type(self.optimizer) is torch.optim.AdamW, "only support AdamW optimizer"
         self.optimizer = CustomAdamW(
@@ -67,8 +63,13 @@ class CustomAdamW(torch.optim.AdamW):
         self.target_iter = target_iter
         self.mode = mode
         self.before_init = before_init
+        if 'svdevery' in self.mode:
+            self.interval = int(self.mode.split('svdevery')[-1])
         if hasattr(self.model, 'classifier'):
-            self.classifier_init = self.model.classifier.weight.clone()
+            try:
+                self.classifier_init = self.model.classifier.weight.clone()
+            except:
+                pass
 
         layer = 0
         for module in self.model.modules():
@@ -77,118 +78,88 @@ class CustomAdamW(torch.optim.AdamW):
                 layer += 1
                 module.iter = 0
                 module.first_micro_batch = True
-                if not self.before_init and 'svd' in self.mode:
-                    with torch.no_grad():
-                        module.inputs = torch.cat(module.inputs, dim=0).cuda()
-                        if "svd1" in self.mode:
-                            _, _, v = torch.svd_lowrank(module.inputs, q=1, niter=4)
-                            module.lora_A['default'].weight.data[0:1] = v.T.detach().clone()
-                        elif "svdr" in self.mode:
-                            _, _, v = torch.svd_lowrank(module.inputs, q=module.lora_A['default'].weight.shape[0], niter=4)
-                            module.lora_A['default'].weight.data = v.T.detach().clone()
-                    del module.inputs
-                    module.svd_init = True
-                    torch.nn.init.zeros_(module.lora_B['default'].weight)
+                module.rank = module.lora_A['default'].weight.shape[0]
 
     def step(self, closure=None):
         loss = super().step(closure)
 
-        if self.before_init:
-            self.state.clear()
-            if hasattr(self.model, 'classifier'):
-                self.model.classifier.weight.data = self.classifier_init
-                torch.nn.init.zeros_(self.model.classifier.bias)
-            for module in self.model.modules():
-                if hasattr(module, 'lora_A'):
-                    torch.nn.init.zeros_(module.lora_B['default'].weight)
-                    
         self._step_count += 1
 
+        ranks = []
         for module in self.model.modules():
             if hasattr(module, 'lora_A'):
                 module.iter += 1
                 module.first_micro_batch = True
-                if self.mode == 'oursnew' and (torch.norm(module.lora_B['default'].weight, dim=0) > 1e-2).all():
+                scale = 1
+                if self._step_count > self.target_iter and 'oursnew' in self.mode and (torch.norm(module.lora_B['default'].weight[:,:module.rank], dim=0) > 1e-2).all() and (torch.norm(module.lora_A['default'].weight[:module.rank], dim=1) > 1e-2).all():
                     with torch.no_grad():
-                        lora_A = module.lora_A['default'].weight
-                        lora_B = module.lora_B['default'].weight
-                        Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
-                        module.lora_A['default'].weight.data = (Q_A * torch.diag(R_A)).T.clone().contiguous()
-                        Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
-                        module.lora_B['default'].weight.data = (Q_B * torch.diag(R_B)).clone().contiguous()
-
-                # if self._step_count % 50 == 0 and (module.layer_idx % 12 == 0 or module.layer_idx % 15 == 0) and self.mode == 'base':
-                #     lora_A = module.lora_A['default'].weight
-                #     lora_B = module.lora_B['default'].weight
-                #     rank_1 = []
-                #     for i in range(lora_A.shape[0]):
-                #         rank_1.append((lora_B[:, i:i+1] @ lora_A[i:i+1]).reshape(-1))
-                #     rank_1 = torch.stack(rank_1, dim=0)
-                #     # Compute pairwise cosine similarity
-                #     normed = torch.nn.functional.normalize(rank_1, dim=1)
-                #     cosine_sim = normed @ normed.T
-                #     # Get top-5 values (excluding diagonal/self-similarity)
-                #     mask = ~torch.eye(cosine_sim.size(0), dtype=torch.bool, device=cosine_sim.device)
-                #     unique_vals = torch.unique(cosine_sim[mask])
-                #     top5_vals, _ = torch.topk(unique_vals, 5)
-                #     wandb.log({
-                #         f'cosine_sim_max_{module.layer_idx}': top5_vals.detach().cpu().numpy()[0],
-                #         f'cosine_sim_mean_{module.layer_idx}': unique_vals.mean().item()
-                #     })
-        '''
-        #if self._step_count == 1 and 'svd' in self.mode and not self.before_init:
-        if False:
-            self.state.clear()
-            if hasattr(self.model, 'classifier'):
-                self.model.classifier.weight.data = self.classifier_init
-                torch.nn.init.zeros_(self.model.classifier.bias)
-            for module in self.model.modules():
-                if hasattr(module, 'lora_A'):
-                    with torch.no_grad():
-                        module.inputs = torch.cat(module.inputs, dim=0).cuda()
-                        if "svd1" in self.mode:
-                            _, _, v = torch.svd_lowrank(module.inputs, q=1, niter=4)
-                            module.lora_A['default'].weight.data[0:1] = v.T.detach().clone()
-                        elif "svdr" in self.mode:
-                            _, _, v = torch.svd_lowrank(module.inputs, q=module.lora_A['default'].weight.shape[0], niter=4)
-                            module.lora_A['default'].weight.data = v.T.detach().clone()
-                    del module.inputs
-                    module.svd_init = True
-                    torch.nn.init.zeros_(module.lora_B['default'].weight)
-
-        if self._step_count == self.target_iter and self.target_iter > 0:
-            self.state.clear()
-            if hasattr(self.model, 'classifier'):
-                self.model.classifier.weight.data = self.classifier_init
-                torch.nn.init.zeros_(self.model.classifier.bias)
-            with torch.no_grad():
-                for module in self.model.modules():
-                    if hasattr(module, 'lora_A'):
                         W = module.base_layer.weight
-                        lora_A = module.lora_A['default'].weight
-                        lora_B = module.lora_B['default'].weight
                         scaling = module.scaling['default']
-                        r = lora_A.shape[0]
+                        lora_A = module.lora_A['default'].weight[:module.rank]
+                        lora_B = module.lora_B['default'].weight[:,:module.rank]
+                        #module.base_layer.weight.data = W + (lora_B @ lora_A).clone().contiguous().to(W.dtype) * scaling
+                        Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
+                        Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
+                        #if self._step_count % 20 == 0 and module.layer_idx % 7 == 0:
+                        if False:
+                            if hasattr(module, 'prev_b') and hasattr(module, 'prev_a'):
+                                ba = (lora_B @ lora_A).reshape(-1)
+                                prev_ba = torch.nn.functional.normalize((module.prev_b @ module.prev_a).reshape(-1),dim=0)
+                                print((torch.nn.functional.normalize(ba,dim=0)*prev_ba).sum(),module.layer_idx)
+                            module.prev_b = module.lora_B['default'].weight.clone().contiguous()
+                            module.prev_a = module.lora_A['default'].weight.clone().contiguous()
+                            
+                        module.lora_A['default'].weight.data[:module.rank] = (Q_A * (torch.diag(R_A)) * scale).T.clone().contiguous()
+                        module.lora_B['default'].weight.data[:,:module.rank] = (Q_B *(torch.diag(R_B)) * scale).clone().contiguous()
+                        #module.base_layer.weight.data = W - (module.lora_B['default'].weight @ module.lora_A['default'].weight).clone().contiguous().to(W.dtype) * scaling
+                if 'init' in self.mode and self._step_count % 10 == 0 and self._step_count < self.target_iter:
+                    if module.layer_idx == 1:
+                        if len(self.param_groups[0]['params']) > len(self.param_groups[1]['params']):
+                            idx = 0
+                        else:
+                            idx = 1
+                        for p in self.param_groups[idx]['params']:
+                            if p in self.state:
+                                state = self.state[p].clear()
+                    with torch.no_grad():
+                        scaling = module.scaling['default']
+                        lora_A = module.lora_A['default'].weight[:module.rank]
+                        lora_B = module.lora_B['default'].weight[:,:module.rank]
+                        module.scaling2 = 1
+                        if True:
+                            if hasattr(module, 'prev_a') and hasattr(module, 'prev_b'):
+                                u, s, v = torch.svd_lowrank(lora_B @ lora_A - module.prev_b @ module.prev_a, q=module.rank, niter=4)
+                            else:
+                                u, s, v = torch.svd_lowrank(lora_B @ lora_A, q=module.rank, niter=4)
+                            module.lora_B['default'].weight.data[:,:module.rank] = u.clone().contiguous()
+                            module.lora_A['default'].weight.data[:module.rank] = v.T.clone().contiguous()
+                            module.detached_b = u.clone().contiguous()
+                            module.detached_a = v.T.clone().contiguous()
+                            module.prev_b = module.lora_B['default'].weight.clone().contiguous()
+                            module.prev_a = module.lora_A['default'].weight.clone().contiguous()
+                            if hasattr(self.model, 'classifier'):
+                                self.model.classifier.weight.data = self.classifier_init
+                                torch.nn.init.zeros_(self.model.classifier.bias)
+                                self.state.clear()
+                        elif False:
+                            if module.layer_idx % 7 == 0:
+                                prev_BA = torch.nn.functional.normalize((module.prev_b @ module.prev_a).reshape(-1),dim=0)
+                                BA = torch.nn.functional.normalize((lora_B @ lora_A).reshape(-1),dim=0)
+                                print((BA * prev_BA).sum(), torch.norm((module.detached_b@module.detached_a).reshape(-1),dim=0),module.layer_idx)
 
-                        target_r = r
-
-                        u, s, v = torch.linalg.svd(lora_B @ lora_A, full_matrices=True)
-                        u = u[:,:target_r]
-                        v = v[:target_r,:]
-                        s = s[:target_r]
-
-                        module.lora_A['default'].weight.data = v.clone().contiguous()
-                        module.lora_B['default'].weight.data = u.clone().contiguous()
-
-                        #module.lora_A_init = v.clone().contiguous()
-                        #module.lora_B_init = u.clone().contiguous()
-
-                        #module.scaling['default'] *= r/target_r / (r**0.5) * (target_r**0.5)
-
-                        module.base_layer.weight.data = W - (module.lora_B['default'].weight @ module.lora_A['default'].weight * module.scaling['default']).to(W.dtype)
-
-                        #module.detach_lora = True
-        '''
+                            #norm_a = torch.norm(module.detached_a, dim=1, keepdim=True) * 0.5 / (module.rank**0.5)
+                            #norm_b = torch.norm(module.detached_b, dim=0, keepdim=True) * 0.5 / (module.rank**0.5)
+                            norm_a = 1
+                            norm_b = 1
+                            Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
+                            module.detached_a = module.detached_a + (lora_A - (Q_A * torch.sign(torch.diag(R_A))).T * module.scaling2 * norm_a).clone().contiguous()
+                            module.lora_A['default'].weight.data[:module.rank] = (Q_A * torch.sign(torch.diag(R_A))).T.clone().contiguous() * module.scaling2 * norm_a
+                            Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
+                            module.detached_b = module.detached_b + (lora_B - (Q_B * torch.sign(torch.diag(R_B))) * module.scaling2 * norm_b).clone().contiguous()
+                            module.lora_B['default'].weight.data[:,:module.rank] = (Q_B * torch.sign(torch.diag(R_B))).clone().contiguous() * module.scaling2 * norm_b
+                            module.prev_b = module.lora_B['default'].weight.clone().contiguous()
+                            module.prev_a = module.lora_A['default'].weight.clone().contiguous()
+                            
         return loss
 
 import torch

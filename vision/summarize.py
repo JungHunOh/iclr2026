@@ -2,13 +2,13 @@ import os
 import json
 import glob
 
-for dataset in ['resisc45', 'cifar100', 'sun397', 'cars', 'dtd', 'cub200', 'food101']:
-#for dataset in ['cifar100']:
-    model='dino-v2-base'
+#for dataset in ['resisc45', 'cifar100', 'sun397', 'cars', 'dtd', 'cub200', 'food101']:
+for dataset in ['resisc45', 'food101', 'sun397', 'cifar100', 'dtd', 'cub200', 'cars']:
+    model='vit-base'
     #methods = ['base','ours','ourssvd1','ourssvdr','basesvd1']
-    methods = ['base','ours','oursdetach']
+    methods = ['base', 'oursnew', 'oursnewinit']
 
-    rs = [4,32]
+    rs = [32]
 
     dirs = []
     results = {}
@@ -24,7 +24,10 @@ for dataset in ['resisc45', 'cifar100', 'sun397', 'cars', 'dtd', 'cub200', 'food
         for r in rs:
             results[method]['r'+str(r)] = {}
             for j in range(4):
-                scale = round(0.5 + j * 0.5,1)
+                if dataset in ['resisc45', 'dtd']:
+                    scale = round(1 + j * 2,1)
+                else:
+                    scale = round(0.5 + j * 1,1)
                 results[method]['r'+str(r)][f'scale{scale}'] = []
                 scales.append(scale)
 
@@ -36,6 +39,7 @@ for dataset in ['resisc45', 'cifar100', 'sun397', 'cars', 'dtd', 'cub200', 'food
             if float(scale[5:]) not in scales: continue
             if method not in methods: continue
             if int(r.replace('r','')) not in rs: continue
+            if '0.0005' in dir: continue
         except:
             continue
         

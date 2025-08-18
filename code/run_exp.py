@@ -11,43 +11,24 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-#    Modified by Zheng Yuan and Hongyi Yuan
 
-import os
 import copy
 import logging
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Sequence, List
-import io
+from typing import Dict, Optional, Sequence
+import random
+
+import numpy as np
 import torch
 import transformers
+import utils
 from torch.utils.data import Dataset
-#from transformers import Trainer
-import argparse
-import json
-import random
-import numpy as np
 
-from peft import get_peft_model, TaskType, LoraConfig
-
-from tqdm import tqdm
-from functools import partial, reduce
+from peft import LoraConfig, get_peft_model
 
 import sys
-sys.path.append("../")
+sys.path.append("..")  # Add parent directory to path for utils import
 from trainer import CustomLoRATrainer as Trainer
-
-def _make_r_io_base(f, mode: str):
-    if not isinstance(f, io.IOBase):
-        f = open(f, mode=mode)
-    return f
-
-def jload(f, mode="r"):
-    """Load a .json file into a dictionary."""
-    f = _make_r_io_base(f, mode)
-    jdict = json.load(f)
-    f.close()
-    return jdict
 
 IGNORE_INDEX = -100
 DEFAULT_PAD_TOKEN = "[PAD]"
@@ -61,31 +42,27 @@ PROMPT_DICT = {
         "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
     ),
     "prompt_no_input": (
-    "Below is an instruction that describes a task. "
-    "Write a response that appropriately completes the request.\n\n"
-    "### Instruction:\n{instruction}\n\n### Response:"
+        "Below is an instruction that describes a task. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Response:"
     ),
 }
-#### 28
+
+
 @dataclass
 class ModelArguments:
     model_name_or_path: Optional[str] = field(default="facebook/opt-125m")
+
+    lora_r: int = field(default=16, metadata={"help": "Lora rank."})
+    lora_alpha: float = field(default=16.0, metadata={"help": "Lora alpha."})
+    prepare_ratio: float = field(default=0)
 
 
 @dataclass
 class DataArguments:
     data_path: str = field(default=None, metadata={"help": "Path to the training data."})
+    dataset: str = field(default='alpaca', metadata={"help": "Dataset to use for training."})
 
-
-@dataclass
-class LoRAArguments:
-    adapter_name: str = field(default='lora')
-    lora_r: int = field(default=None, metadata={"help": "Rank of the low-rank decomposition."})
-    lora_alpha: float = field(default=None)
-    lora_init: any = field(default=True)
-    lora_dropout: float = field(default=0.05)
-    prepare_ratio: float = field(default=0)
-    target_modules: List[str] = field(default_factory=lambda: ["q_proj", "k_proj", "v_proj", "up_proj", "down_proj"])
 
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
@@ -95,16 +72,6 @@ class TrainingArguments(transformers.TrainingArguments):
         default=512,
         metadata={"help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."},
     )
-    overwrite_output_dir: bool = field(default=True)
-
-
-def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: str):
-    """Collects the state dict and dump to disk."""
-    state_dict = trainer.model.state_dict()
-    if trainer.args.should_save:
-        cpu_state_dict = {key: value.cpu() for key, value in state_dict.items()}
-        del state_dict
-        trainer._save(output_dir, state_dict=cpu_state_dict)  # noqa
 
 
 def smart_tokenizer_and_embedding_resize(
@@ -168,56 +135,67 @@ def preprocess(
         label[:source_len] = IGNORE_INDEX
     return dict(input_ids=input_ids, labels=labels)
 
+
 class SupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
-    def __init__(self, data_args, tokenizer: transformers.PreTrainedTokenizer):
+    def __init__(self, data_path: str, tokenizer: transformers.PreTrainedTokenizer):
         super(SupervisedDataset, self).__init__()
         logging.warning("Loading data...")
-        data_path = data_args.data_path
-        try:
-            data_path = data_path_map[data_path]
-        except:
-            data_path = data_path
-        try:
-            list_data_dict = jload(data_path)
-        except BaseException:
-            with open(data_path, 'r') as f:
-                lines = f.readlines()
-            list_data_dict = [json.loads(line.strip()) for line in lines]
+        list_data_dict = utils.jload(data_path)
 
-        list_data_dict = random.sample(list_data_dict,  len(list_data_dict))
-        list_data_dict = list_data_dict[:data_args.data_length]
-
-        # logging.warning("Formatting inputs...")
+        logging.warning("Formatting inputs...")
         prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
-        # print(list_data_dict[0])
-        if 'instruction' in list_data_dict[0]:
-            pass
-        else:
-            def get_input(query):
-                if query.find('\n') == -1:
-                    return ''
-                return '\n'.join(query.split('\n')[1:])
-            list_data_dict = [{'instruction':data['query'].split('\n')[0], 'input':get_input(data['query']), 'output':data['response']} for data in list_data_dict]
-        # import ipdb; ipdb.set_trace()
         sources = [
             prompt_input.format_map(example) if example.get("input", "") != "" else prompt_no_input.format_map(example)
             for example in list_data_dict
         ]
         targets = [f"{example['output']}{tokenizer.eos_token}" for example in list_data_dict]
 
-        self.sources = sources
-        self.targets = targets
+        logging.warning("Tokenizing inputs... This may take some time...")
+        data_dict = preprocess(sources, targets, tokenizer)
+
+        self.input_ids = data_dict["input_ids"]
+        self.labels = data_dict["labels"]
 
     def __len__(self):
-        return len(self.sources)
+        return len(self.input_ids)
 
-    def naive__getitem__(self, i) -> Dict[str, torch.Tensor]:
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
         return dict(input_ids=self.input_ids[i], labels=self.labels[i])
 
-    def __getitem__(self, i):
-        return dict(input_ids=self.sources[i], labels=self.targets[i])
+
+
+class SupervisedHFDataset(Dataset):
+    """Dataset for supervised fine-tuning from a HuggingFace datasets.Dataset object."""
+
+    def __init__(self, hf_dataset, tokenizer: transformers.PreTrainedTokenizer):
+        super().__init__()
+        hy_dataset = hf_dataset.shuffle(seed=42)[:100000]
+
+        hf_dataset = hf_dataset.rename_column("query", "instruction")
+        hf_dataset = hf_dataset.rename_column("answer", "output")
+
+        logging.warning("Formatting HuggingFace dataset inputs...")
+        prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
+        sources = [
+            prompt_input.format_map(example) if example.get("input", "") != "" else prompt_no_input.format_map(example)
+            for example in hf_dataset
+        ]
+        targets = [f"{example['output']}{tokenizer.eos_token}" for example in hf_dataset]
+
+        logging.warning("Tokenizing HuggingFace dataset inputs... This may take some time...")
+        data_dict = preprocess(sources, targets, tokenizer)
+
+        self.input_ids = data_dict["input_ids"]
+        self.labels = data_dict["labels"]
+
+    def __len__(self):
+        return len(self.input_ids)
+
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+        return dict(input_ids=self.input_ids[i], labels=self.labels[i])
+
 
 @dataclass
 class DataCollatorForSupervisedDataset(object):
@@ -225,7 +203,7 @@ class DataCollatorForSupervisedDataset(object):
 
     tokenizer: transformers.PreTrainedTokenizer
 
-    def naive__call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
         input_ids, labels = tuple([instance[key] for instance in instances] for key in ("input_ids", "labels"))
         input_ids = torch.nn.utils.rnn.pad_sequence(
             input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id
@@ -237,42 +215,23 @@ class DataCollatorForSupervisedDataset(object):
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
         )
 
-    def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
-        sources = []
-        targets = []
-        for instance in instances:
-            source = instance['input_ids']
-            target = instance['labels']
-            sources.append(source)
-            targets.append(target)
-
-        data_dict = preprocess(sources, targets, self.tokenizer)
-        input_ids, labels = data_dict['input_ids'], data_dict['labels']
-        # input_ids, labels = tuple([instance[key] for instance in instances] for key in ("input_ids", "labels"))
-        input_ids = torch.nn.utils.rnn.pad_sequence(
-            input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id
-        )
-        labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=IGNORE_INDEX)
-        return dict(
-            input_ids=input_ids,
-            labels=labels,
-            attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
-        )
 
 def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer, data_args) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
-    train_dataset = SupervisedDataset(tokenizer=tokenizer, data_args=data_args)
+    train_dataset = SupervisedDataset(tokenizer=tokenizer, data_path=data_args.data_path)
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
     return dict(train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator)
 
 
-def train():
-    #import wandb
-    #wandb.init(mode="disabled")
+def make_supervised_hf_data_module(tokenizer: transformers.PreTrainedTokenizer, hf_dataset) -> Dict:
+    """Make dataset and collator for supervised fine-tuning from a HuggingFace dataset."""
+    train_dataset = SupervisedHFDataset(hf_dataset, tokenizer=tokenizer)
+    data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
+    return dict(train_dataset=train_dataset, eval_dataset=None, data_collator=data_collator)
 
-    parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments, LoRAArguments))
-    model_args, data_args, training_args, lora_args, remaining_args = parser.parse_args_into_dataclasses(return_remaining_strings=True)
-    data_args.data_length = int(remaining_args[1])
+def train():
+    parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     random.seed(training_args.seed)
     np.random.seed(training_args.seed)
@@ -282,8 +241,7 @@ def train():
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
-        torch_dtype=torch.float16,
-    ).to("cuda")
+    )
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
@@ -292,49 +250,62 @@ def train():
         padding_side="right",
         use_fast=False,
     )
+    special_tokens_dict = dict()
     if tokenizer.pad_token is None:
-        smart_tokenizer_and_embedding_resize(
-            special_tokens_dict=dict(pad_token=DEFAULT_PAD_TOKEN),
-            tokenizer=tokenizer,
-            model=model,
-        )
-    if "llama-2" in model_args.model_name_or_path:
-        tokenizer.add_special_tokens(
-            {
-                "eos_token": DEFAULT_EOS_TOKEN,
-                "bos_token": DEFAULT_BOS_TOKEN,
-                "unk_token": DEFAULT_UNK_TOKEN,
-            }
-        )
+        special_tokens_dict["pad_token"] = DEFAULT_PAD_TOKEN
+    if tokenizer.eos_token is None:
+        special_tokens_dict["eos_token"] = DEFAULT_EOS_TOKEN
+    if tokenizer.bos_token is None:
+        special_tokens_dict["bos_token"] = DEFAULT_BOS_TOKEN
+    if tokenizer.unk_token is None:
+        special_tokens_dict["unk_token"] = DEFAULT_UNK_TOKEN
 
-    data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
+    smart_tokenizer_and_embedding_resize(
+        special_tokens_dict=special_tokens_dict,
+        tokenizer=tokenizer,
+        model=model,
+    )
 
-    config = LoraConfig(
-            r=lora_args.lora_r,
-            lora_alpha=lora_args.lora_alpha,
-            target_modules=lora_args.target_modules,
-            lora_dropout=lora_args.lora_dropout,
-            bias="none",
-            task_type=TaskType.CAUSAL_LM,
-            init_lora_weights=lora_args.lora_init,
-        )
-    
-    model = get_peft_model(model, config)
-    print(f"Trainable Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
-    trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, prepare_ratio=lora_args.prepare_ratio, **data_module)
+    lora_config = LoraConfig(
+        r=model_args.lora_r,
+        lora_alpha=model_args.lora_alpha,
+        target_modules=["q_proj", "v_proj", "k_proj", "up_proj", "down_proj"],
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
+    model = get_peft_model(model, lora_config)
+    model.print_trainable_parameters()
+
+    if data_args.dataset == 'codefeedback':
+        from datasets import load_dataset
+        train_dataset = load_dataset("m-a-p/CodeFeedback-Filtered-Instruction", split='train')
+        data_module = make_supervised_hf_data_module(tokenizer=tokenizer, hf_dataset=train_dataset)
+        
+    elif data_args.dataset == 'alpaca':
+        data_args.data_path = './alpaca_data.json'
+        data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
+        
+    trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, prepare_ratio=model_args.prepare_ratio, **data_module)
 
     trainer.train()
-
     trainer.save_state()
-    # if os.environ.get('LOCAL_RANK') == '0':
-    for param in model.parameters():
-        param.data = param.data.contiguous()
-    model.save_pretrained(training_args.output_dir)
-    tokenizer.save_pretrained(training_args.output_dir)
+    trainer.save_model(output_dir=training_args.output_dir)
 
-    return model, tokenizer, training_args.output_dir.split('/')[-2]
+    if data_args.dataset == 'codefeedback':
+        from eval_humaneval import main as eval_humaneval
+        import os
+        eval_humaneval(model, tokenizer, training_args.output_dir.split('/')[-1])
+
+        dir = os.path.join(training_args.output_dir, "humaneval_samples.jsonl")
+
+        os.system(f"process_jsonl.py {dir}")
+        os.system(f"python eval_human.py {dir.replace('.jsonl', '_modified.jsonl')}")
+    elif data_args.dataset == "alpaca":
+        import eval_mmlu
+        eval_mmlu.main(model, tokenizer, training_args.output_dir)
 
 if __name__ == "__main__":
-    model, tokenizer, name = train()
-    from eval import gsm8k_test_noargs
-    gsm8k_test_noargs(model, tokenizer, name)
+    train()
+
+

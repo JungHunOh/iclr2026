@@ -468,7 +468,6 @@ def main():
         peft_model = model
     else:
         peft_model = get_peft_model(model, config)
-        assert (script_args.prepare_ratio == 0 and script_args.finetuning_method != 'oh') or (script_args.prepare_ratio > 0 and script_args.finetuning_method == 'oh')
         try:
             if 'pissa' in script_args.lora_init:
                 for module in peft_model.modules():
@@ -543,25 +542,6 @@ def main():
     #         num_training_steps=num_train_steps,
     #     )
 
-    if 'svd' in training_args.output_dir:
-        num_cls = len(label2id)
-        training_args.max_steps = (num_cls * 10 // (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps))//2
-        args = TrainingArguments(**training_args.to_dict())
-
-        trainer = Trainer(
-            peft_model,
-            args,
-            train_dataset=dataset_train,
-            eval_dataset=dataset_val,
-            tokenizer=image_processor,
-            compute_metrics=compute_metrics,
-            data_collator=collate_fn,
-            prepare_ratio=script_args.prepare_ratio,
-        )
-
-        train_results = trainer.train()
-
-    training_args.max_steps = -1
     args = TrainingArguments(**training_args.to_dict())
 
     trainer = Trainer(
@@ -591,6 +571,7 @@ def main():
 
     eval_results = trainer.evaluate(dataset_test)
     print(eval_results)
+    print(training_args.output_dir)
 
     for key in script_args.__dataclass_fields__:
         value = getattr(script_args, key)
