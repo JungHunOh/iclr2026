@@ -85,7 +85,7 @@ class LoRAArguments:
     lora_init: any = field(default=True)
     lora_dropout: float = field(default=0.05)
     prepare_ratio: float = field(default=0)
-    target_modules: List[str] = field(default_factory=lambda: ["q_proj", "k_proj", "v_proj", "up_proj", "down_proj"])
+    target_modules: List[str] = field(default_factory=lambda: ["q_proj", "k_proj", "v_proj"])
 
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):

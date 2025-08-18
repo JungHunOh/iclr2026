@@ -269,24 +269,10 @@ MODEL_NAME_TO_URL = {
 
 
 def get_target_modules(model_name, finetuning_method):
-    if model_name == "dino-v2-base":
-        if finetuning_method in {"vera", "svft"}:
-            return [
-                "query",
-                "key",
-            ]
-        else:
-            return "all-linear"
-    elif model_name in {"vit-base", "vit-large"}:
-        if finetuning_method == "head":
-            return []
-        else:
-            return [
-                "query",
-                "value",
-            ]
-    else:
-        raise ValueError("Unknown model name")
+    return [
+        "query",
+        "value",
+    ]
 
 
 def get_classifier_modules(model_name):

@@ -559,9 +559,9 @@ def main():
         data_collator = None
 
     if model_args.model_name_or_path == "google-t5/t5-base":
-        target_modules = ["q", "v", "k", "o", "wi", "wo"]
+        target_modules = ["q", "v", "k"]
     elif model_args.model_name_or_path == "microsoft/deberta-v3-base":
-        target_modules = ["query_proj", "value_proj", "key_proj", "intermediate.dense", "output.dense"]
+        target_modules = ["query_proj", "value_proj", "key_proj"]
 
     lora_config = LoraConfig(
         r=model_args.lora_r,

@@ -13,15 +13,11 @@ lr=2e-4
 epoch=3
 bs=32
 
-if model == 'gpt':
-    base_model = 'EleutherAI/gpt-j-6b'
-    target_modules = ["q_proj", "k_proj", "v_proj", "fc_in", "fc_out"]
-elif model == 'llama':
-    base_model = 'yahma/llama-7b-hf'
-    target_modules=["q_proj", "k_proj", "v_proj", "up_proj", "down_proj"]
+if model == 'llama2':
+    base_model = 'meta-llama/Llama-2-7b-hf'
 elif model == 'llama3':
     base_model = 'meta-llama/Meta-Llama-3-8B'
-    target_modules=["q_proj", "k_proj", "v_proj", "up_proj", "down_proj"]
+target_modules=["q_proj", "k_proj", "v_proj"]
 
 for seed in [1]:
     for r, scale, ratio, epoch in [(4,8,0,3),(4,4,0,3)]:

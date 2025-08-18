@@ -269,7 +269,7 @@ def train():
     lora_config = LoraConfig(
         r=model_args.lora_r,
         lora_alpha=model_args.lora_alpha,
-        target_modules=["q_proj", "v_proj", "k_proj", "up_proj", "down_proj"],
+        target_modules=["q_proj", "v_proj", "k_proj"],
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM",
