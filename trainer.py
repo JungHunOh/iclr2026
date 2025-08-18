@@ -63,8 +63,6 @@ class CustomAdamW(torch.optim.AdamW):
         self.target_iter = target_iter
         self.mode = mode
         self.before_init = before_init
-        if 'svdevery' in self.mode:
-            self.interval = int(self.mode.split('svdevery')[-1])
         if hasattr(self.model, 'classifier'):
             try:
                 self.classifier_init = self.model.classifier.weight.clone()
@@ -85,7 +83,6 @@ class CustomAdamW(torch.optim.AdamW):
 
         self._step_count += 1
 
-        ranks = []
         for module in self.model.modules():
             if hasattr(module, 'lora_A'):
                 module.iter += 1
@@ -97,21 +94,10 @@ class CustomAdamW(torch.optim.AdamW):
                         scaling = module.scaling['default']
                         lora_A = module.lora_A['default'].weight[:module.rank]
                         lora_B = module.lora_B['default'].weight[:,:module.rank]
-                        #module.base_layer.weight.data = W + (lora_B @ lora_A).clone().contiguous().to(W.dtype) * scaling
                         Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
                         Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
-                        #if self._step_count % 20 == 0 and module.layer_idx % 7 == 0:
-                        if False:
-                            if hasattr(module, 'prev_b') and hasattr(module, 'prev_a'):
-                                ba = (lora_B @ lora_A).reshape(-1)
-                                prev_ba = torch.nn.functional.normalize((module.prev_b @ module.prev_a).reshape(-1),dim=0)
-                                print((torch.nn.functional.normalize(ba,dim=0)*prev_ba).sum(),module.layer_idx)
-                            module.prev_b = module.lora_B['default'].weight.clone().contiguous()
-                            module.prev_a = module.lora_A['default'].weight.clone().contiguous()
-                            
-                        module.lora_A['default'].weight.data[:module.rank] = (Q_A * (torch.diag(R_A)) * scale).T.clone().contiguous()
-                        module.lora_B['default'].weight.data[:,:module.rank] = (Q_B *(torch.diag(R_B)) * scale).clone().contiguous()
-                        #module.base_layer.weight.data = W - (module.lora_B['default'].weight @ module.lora_A['default'].weight).clone().contiguous().to(W.dtype) * scaling
+                        module.lora_A['default'].weight.data[:module.rank] = (Q_A * torch.diag(R_A)).T.clone().contiguous()
+                        module.lora_B['default'].weight.data[:,:module.rank] = (Q_B *torch.diag(R_B)).clone().contiguous()
                 if 'init' in self.mode and self._step_count % 10 == 0 and self._step_count < self.target_iter:
                     if module.layer_idx == 1:
                         if len(self.param_groups[0]['params']) > len(self.param_groups[1]['params']):

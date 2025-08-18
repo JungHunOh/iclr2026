@@ -18,34 +18,37 @@ lr = 1e-3
 bs = 64
 r = 32
 for scale in [0.5,1,2]:
-    method = 'base'
-    seed = 1
+    for target_modules in ['v_proj', 'q_proj v_proj', 'q_proj k_proj v_proj']:
+        target_modules_name = target_modules.replace(' ', '').replace('_proj','')
+        method = 'base'
+        seed = 1
 
-    output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_lr{lr}_r{r}_scale{scale}_{method}_seed{seed}"
+        output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_lr{lr}_r{r}_scale{scale}_seed{seed}_{method}_{target_modules_name}"
 
-    # Alpaca finetuning
-    os.system(
-        f"CUDA_VISIBLE_DEVICES={gpu} "
-        f"python run_exp.py "
-        f"--model_name_or_path {model_name} "
-        f"--dataset {dataset} "
-        f"--bf16 True "
-        f"--output_dir {output_dir} "
-        f"--num_train_epochs {epoch} "
-        f"--per_device_train_batch_size 4 "
-        f"--per_device_eval_batch_size {bs} "
-        f"--gradient_accumulation_steps {bs//4} "
-        f"--eval_strategy 'no' "
-        f"--save_strategy 'no' "
-        f"--learning_rate {lr} "
-        f"--weight_decay 0. "
-        f"--warmup_ratio 0.03 "
-        f"--lr_scheduler_type 'cosine' "
-        f"--logging_steps 50 "
-        f"--tf32 True "
-        f"--seed {seed} "
-        f"--lora_r {r} "
-        f"--lora_alpha {scale * r**0.5} "
-        f"--prepare_ratio {ratio} "
-    )
+        # Alpaca finetuning
+        os.system(
+            f"CUDA_VISIBLE_DEVICES={gpu} "
+            f"python run_exp.py "
+            f"--model_name_or_path {model_name} "
+            f"--dataset {dataset} "
+            f"--bf16 True "
+            f"--output_dir {output_dir} "
+            f"--num_train_epochs {epoch} "
+            f"--per_device_train_batch_size 4 "
+            f"--per_device_eval_batch_size {bs} "
+            f"--gradient_accumulation_steps {bs//4} "
+            f"--eval_strategy 'no' "
+            f"--save_strategy 'no' "
+            f"--learning_rate {lr} "
+            f"--weight_decay 0. "
+            f"--warmup_ratio 0.03 "
+            f"--lr_scheduler_type 'cosine' "
+            f"--logging_steps 50 "
+            f"--tf32 True "
+            f"--seed {seed} "
+            f"--lora_r {r} "
+            f"--lora_alpha {scale * r**0.5} "
+            f"--prepare_ratio {ratio} "
+            f"--target_modules {target_modules} "
+        )
 

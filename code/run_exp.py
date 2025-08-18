@@ -15,7 +15,7 @@
 import copy
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Sequence, List
 import random
 
 import numpy as np
@@ -56,6 +56,11 @@ class ModelArguments:
     lora_r: int = field(default=16, metadata={"help": "Lora rank."})
     lora_alpha: float = field(default=16.0, metadata={"help": "Lora alpha."})
     prepare_ratio: float = field(default=0)
+
+    target_modules: List[str] = field(
+        default_factory=list,
+        metadata={"help": "Target modules for finetuning"},
+    )
 
 
 @dataclass
@@ -269,7 +274,7 @@ def train():
     lora_config = LoraConfig(
         r=model_args.lora_r,
         lora_alpha=model_args.lora_alpha,
-        target_modules=["q_proj", "v_proj", "k_proj"],
+        target_modules=model_args.target_modules,
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM",

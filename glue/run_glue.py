@@ -21,7 +21,7 @@ import random
 import sys
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 
 import datasets
 import evaluate
@@ -231,6 +231,11 @@ class ModelArguments:
     )
 
     prepare_ratio: Optional[float] = field(default=0.0, metadata={"help": "LoRA prepare ratio"})
+
+    target_modules: List[str] = field(
+        default_factory=list,
+        metadata={"help": "Target modules for finetuning"},
+    )
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -561,15 +566,10 @@ def main():
     else:
         data_collator = None
 
-    if model_args.model_name_or_path == "google-t5/t5-base":
-        target_modules = ["q", "v", "k"]
-    elif model_args.model_name_or_path == "microsoft/deberta-v3-base":
-        target_modules = ["query_proj", "value_proj", "key_proj"]
-
     lora_config = LoraConfig(
         r=model_args.lora_r,
         lora_alpha=model_args.lora_alpha,
-        target_modules=target_modules,
+        target_modules=model_args.target_modules,
         lora_dropout=0.05,
         bias="none",
         task_type="SEQ_CLS",
