@@ -61,6 +61,7 @@ def eval(model, tokenizer, name):
         #print(outputs)
         return outputs
 
+    model.eval()
     #tokenizer, model = load_model(args)
 
     for ds in ["boolq", "piqa", "social_i_qa", "hellaswag", "winogrande", "ARC-Challenge", "ARC-Easy", "openbookqa"]:
@@ -69,7 +70,7 @@ def eval(model, tokenizer, name):
         create_dir('experiment/')
 
         dataset = load_data(ds)
-        batches = create_batch(dataset, 1)
+        batches = create_batch(dataset, 50)
         total = len(batches)
         correct = 0
         current = 0

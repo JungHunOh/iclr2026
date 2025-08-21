@@ -63,9 +63,11 @@ class CustomAdamW(torch.optim.AdamW):
         self.target_iter = target_iter
         self.mode = mode
         self.before_init = before_init
-        if hasattr(self.model, 'classifier'):
+        try:
+            self.classifier_params = [p for p in self.model.classifier.parameters() if p.requires_grad]
+        except:
             try:
-                self.classifier_init = self.model.classifier.weight.clone()
+                self.classifier_params = [p for p in self.model.classification_head.parameters() if p.requires_grad]
             except:
                 pass
 
@@ -83,68 +85,73 @@ class CustomAdamW(torch.optim.AdamW):
 
         self._step_count += 1
 
+        mean_rank = 0
         for module in self.model.modules():
             if hasattr(module, 'lora_A'):
                 module.iter += 1
                 module.first_micro_batch = True
                 scale = 1
-                if self._step_count > self.target_iter and 'oursnew' in self.mode and (torch.norm(module.lora_B['default'].weight[:,:module.rank], dim=0) > 1e-2).all() and (torch.norm(module.lora_A['default'].weight[:module.rank], dim=1) > 1e-2).all():
-                    with torch.no_grad():
-                        W = module.base_layer.weight
-                        scaling = module.scaling['default']
-                        lora_A = module.lora_A['default'].weight[:module.rank]
-                        lora_B = module.lora_B['default'].weight[:,:module.rank]
-                        Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
-                        Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
-                        module.lora_A['default'].weight.data[:module.rank] = (Q_A * torch.diag(R_A)).T.clone().contiguous()
-                        module.lora_B['default'].weight.data[:,:module.rank] = (Q_B *torch.diag(R_B)).clone().contiguous()
-                if 'init' in self.mode and self._step_count % 10 == 0 and self._step_count < self.target_iter:
-                    if module.layer_idx == 1:
-                        if len(self.param_groups[0]['params']) > len(self.param_groups[1]['params']):
-                            idx = 0
-                        else:
-                            idx = 1
-                        for p in self.param_groups[idx]['params']:
-                            if p in self.state:
-                                state = self.state[p].clear()
-                    with torch.no_grad():
-                        scaling = module.scaling['default']
-                        lora_A = module.lora_A['default'].weight[:module.rank]
-                        lora_B = module.lora_B['default'].weight[:,:module.rank]
-                        module.scaling2 = 1
-                        if True:
-                            if hasattr(module, 'prev_a') and hasattr(module, 'prev_b'):
-                                u, s, v = torch.svd_lowrank(lora_B @ lora_A - module.prev_b @ module.prev_a, q=module.rank, niter=4)
-                            else:
-                                u, s, v = torch.svd_lowrank(lora_B @ lora_A, q=module.rank, niter=4)
-                            module.lora_B['default'].weight.data[:,:module.rank] = u.clone().contiguous()
-                            module.lora_A['default'].weight.data[:module.rank] = v.T.clone().contiguous()
-                            module.detached_b = u.clone().contiguous()
-                            module.detached_a = v.T.clone().contiguous()
-                            module.prev_b = module.lora_B['default'].weight.clone().contiguous()
-                            module.prev_a = module.lora_A['default'].weight.clone().contiguous()
-                            if hasattr(self.model, 'classifier'):
-                                self.model.classifier.weight.data = self.classifier_init
-                                torch.nn.init.zeros_(self.model.classifier.bias)
-                                self.state.clear()
-                        elif False:
-                            if module.layer_idx % 7 == 0:
-                                prev_BA = torch.nn.functional.normalize((module.prev_b @ module.prev_a).reshape(-1),dim=0)
-                                BA = torch.nn.functional.normalize((lora_B @ lora_A).reshape(-1),dim=0)
-                                print((BA * prev_BA).sum(), torch.norm((module.detached_b@module.detached_a).reshape(-1),dim=0),module.layer_idx)
-
-                            #norm_a = torch.norm(module.detached_a, dim=1, keepdim=True) * 0.5 / (module.rank**0.5)
-                            #norm_b = torch.norm(module.detached_b, dim=0, keepdim=True) * 0.5 / (module.rank**0.5)
-                            norm_a = 1
-                            norm_b = 1
+                lora_A = module.lora_A['default'].weight[:module.rank]
+                lora_B = module.lora_B['default'].weight[:,:module.rank]
+                with torch.no_grad():
+                    if self._step_count > self.target_iter and 'oursnew' in self.mode and (torch.norm(module.lora_B['default'].weight[:,:module.rank], dim=0) > 1e-2).all() and (torch.norm(module.lora_A['default'].weight[:module.rank], dim=1) > 1e-2).all():
+                        if 'init' not in self.mode or self._step_count > self.target_iter + 20:
+                            scaling = module.scaling['default']
                             Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
-                            module.detached_a = module.detached_a + (lora_A - (Q_A * torch.sign(torch.diag(R_A))).T * module.scaling2 * norm_a).clone().contiguous()
-                            module.lora_A['default'].weight.data[:module.rank] = (Q_A * torch.sign(torch.diag(R_A))).T.clone().contiguous() * module.scaling2 * norm_a
                             Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
-                            module.detached_b = module.detached_b + (lora_B - (Q_B * torch.sign(torch.diag(R_B))) * module.scaling2 * norm_b).clone().contiguous()
-                            module.lora_B['default'].weight.data[:,:module.rank] = (Q_B * torch.sign(torch.diag(R_B))).clone().contiguous() * module.scaling2 * norm_b
-                            module.prev_b = module.lora_B['default'].weight.clone().contiguous()
-                            module.prev_a = module.lora_A['default'].weight.clone().contiguous()
+                            if 'qrab' in self.mode:
+                                module.lora_A['default'].weight.data[:module.rank] = (Q_A * torch.diag(R_A)).T.clone().contiguous()
+                                module.lora_B['default'].weight.data[:,:module.rank] = (Q_B * torch.diag(R_B)).clone().contiguous()
+                            if 'noproj' not in self.mode:
+                                if 'scaling' in self.mode:
+                                    module.proj_a = (Q_A * torch.diag(R_A)).T.clone().contiguous()
+                                    module.proj_b = (Q_B * torch.diag(R_B)).clone().contiguous()
+                                else:
+                                    module.proj_a = (Q_A * torch.sign(torch.diag(R_A))).T.clone().contiguous()
+                                    module.proj_b = (Q_B * torch.sign(torch.diag(R_B))).clone().contiguous()
+
+                    elif self._step_count % 20 == 0 and self._step_count < self.target_iter and 'init' in self.mode:
+                                if hasattr(module, 'prev_a') and hasattr(module, 'prev_b'):
+                                    u, s, v = torch.svd_lowrank(lora_B @ lora_A - module.prev_b @ module.prev_a, q=module.rank, niter=4)
+                                    module.init_count += 1
+                                else:
+                                    u, s, v = torch.svd_lowrank(lora_B @ lora_A, q=module.rank, niter=4)
+                                    module.init_count = 1
+                                module.lora_B['default'].weight.data = u.clone().contiguous()
+                                module.lora_A['default'].weight.data = v.T.clone().contiguous()
+                                module.detached_b = u.clone().contiguous()
+                                module.detached_a = v.T.clone().contiguous()
+                                module.prev_b = u.clone().contiguous()
+                                module.prev_a = v.T.clone().contiguous()
+                                try:
+                                    for p, p_init in zip(self.model.classifier.parameters(), self.classifier_params):
+                                        if p.requires_grad:
+                                            p.data = p_init.data.clone().contiguous()
+                                except:
+                                    try:
+                                        for p, p_init in zip(self.model.classification_head.parameters(), self.classifier_params):
+                                            if p.requires_grad:
+                                                p.data = p_init.data.clone().contiguous()
+                                    except:
+                                        pass
+                                self.state.clear()
+                            
+                    if self._step_count == self.target_iter and 'init' in self.mode:
+                        self.state.clear()
+                        if self.mode == 'oursnewinitnoproj':
+                            module.lora_B['default'].weight.data = module.detached_b.clone().contiguous()
+                            module.lora_A['default'].weight.data = module.detached_a.clone().contiguous()
+                            del module.prev_a
+                            del module.prev_b
+                        else:
+                            module.proj_a = module.detached_a.clone().contiguous()
+                            module.proj_b = module.detached_b.clone().contiguous()
+                            torch.nn.init.zeros_(module.lora_A['default'].weight)
+                            torch.nn.init.zeros_(module.lora_B['default'].weight)
+                            del module.prev_a
+                            del module.prev_b
+                            del module.detached_a
+                            del module.detached_b
                             
         return loss
 

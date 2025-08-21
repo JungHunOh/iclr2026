@@ -62,7 +62,7 @@ for task in ["rte"]:
                             f"--logging_dir {output_dir}/log "
                             f"--eval_strategy no "
                             f"--save_strategy no "
-                            f"--warmup_ratio 0.1 "
+                            f"--warmup_ratio 0 "
                             f"--lora_r {r} "
                             f"--lora_alpha {alpha} "
                             f"--seed {seed} "

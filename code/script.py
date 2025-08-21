@@ -15,10 +15,10 @@ dataset = 'alpaca'
 ratio=0
 epoch = 3
 lr = 1e-3
-bs = 64
+bs = 128
 r = 32
 for scale in [0.5,1,2]:
-    for target_modules in ['v_proj', 'q_proj v_proj', 'q_proj k_proj v_proj']:
+    for target_modules in ['q_proj k_proj v_proj']:
         target_modules_name = target_modules.replace(' ', '').replace('_proj','')
         method = 'base'
         seed = 1
@@ -41,7 +41,7 @@ for scale in [0.5,1,2]:
             f"--save_strategy 'no' "
             f"--learning_rate {lr} "
             f"--weight_decay 0. "
-            f"--warmup_ratio 0.03 "
+            f"--warmup_ratio 0 "
             f"--lr_scheduler_type 'cosine' "
             f"--logging_steps 50 "
             f"--tf32 True "

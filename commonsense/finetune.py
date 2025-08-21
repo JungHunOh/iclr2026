@@ -1,6 +1,8 @@
 import os
 import sys
 from typing import List
+import random
+import numpy as np
 
 import fire
 import torch
@@ -43,6 +45,7 @@ def train(
         use_gradient_checkpointing: bool = False,
         eval_step: int = 200,
         save_step: int = 200,
+        seed: int = 42,
         # lora hyperparams/params
         lora_r: int = 8,
         lora_alpha: int = 16,
@@ -106,6 +109,13 @@ def train(
         base_model
     ), "Please specify a --base_model, e.g. --base_model='decapoda-research/llama-7b-hf'"
     gradient_accumulation_steps = batch_size // micro_batch_size
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    transformers.set_seed(seed)
 
     import wandb
 
@@ -247,7 +257,7 @@ def train(
 
     if val_set_size > 0:
         train_val = data["train"].train_test_split(
-            test_size=val_set_size, shuffle=True, seed=42
+            test_size=val_set_size, shuffle=True, seed=seed
         )
         train_data = (
             train_val["train"].shuffle().map(generate_and_tokenize_prompt)
@@ -271,11 +281,11 @@ def train(
         args=transformers.TrainingArguments(
             per_device_train_batch_size=micro_batch_size,
             gradient_accumulation_steps=gradient_accumulation_steps,
-            warmup_steps=100,
+            warmup_steps=0,
             num_train_epochs=num_epochs,
             learning_rate=learning_rate,
             fp16=True,
-            logging_steps=50,
+            logging_steps=20,
             optim="adamw_torch",
             eval_strategy="epoch" if val_set_size > 0 else "no",
             save_strategy="no",
@@ -305,8 +315,6 @@ def train(
         model = torch.compile(model)
 
     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
-
-    model = model.merge_and_unload()
 
     model.save_pretrained(output_dir)
 
