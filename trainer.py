@@ -111,30 +111,30 @@ class CustomAdamW(torch.optim.AdamW):
                                     module.proj_b = (Q_B * torch.sign(torch.diag(R_B))).clone().contiguous()
 
                     elif self._step_count % 20 == 0 and self._step_count < self.target_iter and 'init' in self.mode:
-                                if hasattr(module, 'prev_a') and hasattr(module, 'prev_b'):
-                                    u, s, v = torch.svd_lowrank(lora_B @ lora_A - module.prev_b @ module.prev_a, q=module.rank, niter=4)
-                                    module.init_count += 1
-                                else:
-                                    u, s, v = torch.svd_lowrank(lora_B @ lora_A, q=module.rank, niter=4)
-                                    module.init_count = 1
-                                module.lora_B['default'].weight.data = u.clone().contiguous()
-                                module.lora_A['default'].weight.data = v.T.clone().contiguous()
-                                module.detached_b = u.clone().contiguous()
-                                module.detached_a = v.T.clone().contiguous()
-                                module.prev_b = u.clone().contiguous()
-                                module.prev_a = v.T.clone().contiguous()
-                                try:
-                                    for p, p_init in zip(self.model.classifier.parameters(), self.classifier_params):
-                                        if p.requires_grad:
-                                            p.data = p_init.data.clone().contiguous()
-                                except:
-                                    try:
-                                        for p, p_init in zip(self.model.classification_head.parameters(), self.classifier_params):
-                                            if p.requires_grad:
-                                                p.data = p_init.data.clone().contiguous()
-                                    except:
-                                        pass
-                                self.state.clear()
+                        if hasattr(module, 'prev_a') and hasattr(module, 'prev_b'):
+                            u, s, v = torch.svd_lowrank(lora_B @ lora_A - module.prev_b @ module.prev_a, q=module.rank, niter=4)
+                            module.init_count += 1
+                        else:
+                            u, s, v = torch.svd_lowrank(lora_B @ lora_A, q=module.rank, niter=4)
+                            module.init_count = 1
+                        module.lora_B['default'].weight.data = u.clone().contiguous()
+                        module.lora_A['default'].weight.data = v.T.clone().contiguous()
+                        module.detached_b = u.clone().contiguous()
+                        module.detached_a = v.T.clone().contiguous()
+                        module.prev_b = u.clone().contiguous()
+                        module.prev_a = v.T.clone().contiguous()
+                        try:
+                            for p, p_init in zip(self.model.classifier.parameters(), self.classifier_params):
+                                if p.requires_grad:
+                                    p.data = p_init.data.clone().contiguous()
+                        except:
+                            try:
+                                for p, p_init in zip(self.model.classification_head.parameters(), self.classifier_params):
+                                    if p.requires_grad:
+                                        p.data = p_init.data.clone().contiguous()
+                            except:
+                                pass
+                        self.state.clear()
                             
                     if self._step_count == self.target_iter and 'init' in self.mode:
                         self.state.clear()
