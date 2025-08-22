@@ -70,7 +70,7 @@ def eval(model, tokenizer, name):
         create_dir('experiment/')
 
         dataset = load_data(ds)
-        batches = create_batch(dataset, 50)
+        batches = create_batch(dataset, 1)
         total = len(batches)
         correct = 0
         current = 0

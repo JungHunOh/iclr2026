@@ -304,7 +304,7 @@ def train():
 
         dir = os.path.join(training_args.output_dir, "humaneval_samples.jsonl")
 
-        os.system(f"process_jsonl.py {dir}")
+        os.system(f"python process_jsonl.py {dir}")
         os.system(f"python eval_human.py {dir.replace('.jsonl', '_modified.jsonl')}")
     elif data_args.dataset == "alpaca":
         import eval_mmlu
