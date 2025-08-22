@@ -6,7 +6,7 @@ gpu=int(input())
 dataset='commonsense_170k'
 
 
-for model in ['llama3', 'gemma']:
+for model in ['gemma','llama3']:
 
     if model == 'gemma':
         base_model = 'google/gemma-2b'
@@ -14,16 +14,17 @@ for model in ['llama3', 'gemma']:
         base_model = 'meta-llama/Meta-Llama-3-8B'
     
     lr=5e-4
-    epoch=3
+    epoch=4
     bs=128
+    mini_bs=16 if model == 'llama3' else 32
     scale=4
 
     target_modules=["q_proj", "k_proj", "v_proj"]
 
-    #for mode in ['base', 'pissa', 'dora', 'oursinit']:
-    for method in ['base']:
-        for seed in [1,2,3]:
-            for r in [8,16,32]:
+    for seed in [1,2,3]:
+        #for mode in ['base', 'pissa', 'dora', 'oursinit']:
+        for method in ['base','oursinit']:
+            for r in [32]:
                 if 'init' in method:
                     max_steps = 50
                 else:
@@ -34,7 +35,7 @@ for model in ['llama3', 'gemma']:
                     f'--data_path ./ft-training_set/{dataset}.json '
                     f'--output_dir ./trained_models/{model}_{dataset}_lr{lr}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_{method}_seed{seed}/ '
                     f'--batch_size {bs} '
-                    f'--micro_batch_size 16 '
+                    f'--micro_batch_size {mini_bs} '
                     f'--num_epochs {epoch} '
                     f'--learning_rate {lr} '
                     f'--cutoff_len 256 '
