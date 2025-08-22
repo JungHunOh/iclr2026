@@ -5,33 +5,27 @@ print('PID:', os.getpid())
 print('enter gpu')
 gpu=input()
 
-#model='gpt'
-#model='llama'
-#model='llama2'
-for model in ['llama3', 'llama2']:
+for model in ['llama3', 'gemma']:
 
-    if model == 'gpt':
-        base_model = 'EleutherAI/gpt-j-6b'
-    elif model == 'llama':
-        base_model = 'yahma/llama-7b-hf'
-    elif model == 'llama2':
-        base_model = "meta-llama/Llama-2-7b-hf"
+    if model == 'gemma':
+        base_model = 'google/gemma-2b'
     elif model == 'llama3':
         base_model = 'meta-llama/Meta-Llama-3-8B'
 
     bs=128
 
-    ratio=0.03
-    init='True'
-    max_steps=-1
     epoch=3
-    for seed in [1]:
+    for seed in [1,2,3]:
         for target_modules in ['q_proj k_proj v_proj']:
             target_modules_name = target_modules.replace(' ', '').replace('_proj','')
             for lr in [5e-4]:
-                for r, scale in [(32,8),(32,4)]:
-                    for method in ['oursnewinitfinal']:
-                        alpha = int(scale * (r**0.5))
+                for r, scale in [(32,4)]:
+                    #for mode in ['base', 'pissa', 'dora', 'oursinit']:
+                    for method in ['base']:
+                        if 'init' in method:
+                            max_steps = 50
+                        else:
+                            max_steps = -1
                         os.system(f'CUDA_VISIBLE_DEVICES={gpu} python train_math.py \
                             --model_name_or_path {base_model}\
                             --data_path ft-training_set/MetaMathQA-40K.json \
@@ -46,15 +40,13 @@ for model in ['llama3', 'llama2']:
                             --learning_rate {lr}\
                             --weight_decay 0. \
                             --warmup_ratio 0 \
-                            --logging_steps 10 \
+                            --logging_steps 20 \
                             --max_steps {max_steps} \
                             --num_train_epochs {epoch} \
                             --lr_scheduler_type "cosine" \
                             --target_modules {target_modules} \
                             --lora_r {r}\
-                            --lora_alpha {alpha}\
+                            --lora_alpha {scale}\
                             --seed {seed}\
                             --lora_dropout 0.05\
-                            --lora_init {init}\
-                            --prepare_ratio {ratio}\
                                 ')

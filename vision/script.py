@@ -10,16 +10,11 @@ ii = int(cuda_visible_devices)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = cuda_visible_devices
 
-for model in ['vit-base']:
-    for dataset in ['cifar100']:
+for model in ['vit-base', 'vit-large']:
+    for dataset in ['cifar100', 'resisc45', 'food101', 'dtd', 'cub200', 'cars', 'sun397']:
     #for dataset in ['sun397']:
-        bs = 128
-
-        method='lora'
-        #method='oh'
-
-        init='True'
-        #init='pissa_niter_4'
+        bs = 256
+        mini_bs = 64
 
         if dataset in ['resisc45', 'food101']:
             epoch = 10
@@ -28,58 +23,55 @@ for model in ['vit-base']:
         elif dataset in ['cifar100']:
             epoch = 7
         elif dataset in ['dtd', 'cub200']:
-            epoch = 20
+            epoch = 25
         elif dataset in ['cars']:
             epoch = 20
-
-        lr = 5e-3 if dataset == 'cars' else 2e-3
+        
+        if dataset == 'cifar100' or dataset == 'sun397':
+            lr = 1e-3
+        elif dataset == 'cars':
+            lr = 5e-3
+        else:
+            lr = 2e-3
 
         for target_modules in ['query value']:
             target_modules_name = target_modules.replace(' ', '')
 
-            for seed in [1]:
-                #for mode in ['oursnewinitnoab','oursnewinitnoabscaling']:
-                for mode in ['oursnewinitnoabscaling']:
-                    for r in [128]:
-                        for scale in [1]:
-                            if dataset in ['cifar100','sun397']:
-                                scale /= 5
-
+            for seed in [1,2,3]:
+                #for mode in ['base', 'pissa', 'dora', 'oursinit']:
+                for mode in ['base']:
+                    for r in [8,16,32]:
+                        for scale in [4]:
                             if 'init' in mode:
-                                ratio=0.1
+                                max_steps = 50
                             else:
-                                ratio=0
+                                max_steps = -1
                             
-                            alpha = math.sqrt(r) * scale
-                            if method == 'lora':
-                                output_dir = f"./experiment/{dataset}/{model}_lora_epoch{epoch}_bs{bs}_init{init}_lr{lr}_alpha{scale}_r{r}_{mode}_{target_modules_name}/"
-                            elif method == 'oh':
-                                output_dir = f"./experiment/{dataset}/{model}_lora_epoch{epoch}_bs{bs}_init{init}_lr{lr}_alpha{scale}_r{r}_{mode}_{target_modules_name}/"
+                            output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_bs{bs}_lr{lr}_alpha{scale}_r{r}_{mode}_{target_modules_name}/"
                             cmd = (
                                 f"python finetune.py "
                                 f"--eval_strategy no "
                                 f"--save_strategy no "
-                                f"--gradient_accumulation_steps 1 "
+                                f"--gradient_accumulation_steps {bs//mini_bs} "
                                 f"--dataloader_num_workers 8 "
                                 f"--logging_steps 50 "
                                 f"--label_names labels "
                                 f"--remove_unused_columns False "
-                                f"--per_device_train_batch_size 128 "
+                                f"--per_device_train_batch_size {mini_bs} "
                                 f"--per_device_eval_batch_size 256 "
                                 f"--seed {seed} "
                                 f"--num_train_epochs {epoch} "
                                 f"--lora_rank {r} "
                                 f"--output_dir {output_dir} "
                                 f"--model_name {model} "
-                                f"--finetuning_method {method} "
+                                f"--finetuning_method lora "
                                 f"--dataset_name {dataset} "
                                 f"--clf_learning_rate {lr} "
                                 f"--other_learning_rate {lr} "
                                 f"--warmup_ratio 0 "
                                 f"--weight_decay 0 "
-                                f"--lora_alpha {alpha} "
-                                f"--lora_init {init} "
-                                f"--prepare_ratio {ratio} "
+                                f"--lora_alpha {scale} "
                                 f"--target_modules {target_modules} "
+                                f"--max_steps {max_steps} "
                             )
                             os.system(cmd)

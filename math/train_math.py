@@ -84,7 +84,6 @@ class LoRAArguments:
     lora_alpha: float = field(default=None)
     lora_init: any = field(default=True)
     lora_dropout: float = field(default=0.05)
-    prepare_ratio: float = field(default=0)
     target_modules: List[str] = field(default_factory=lambda: ["q_proj", "k_proj", "v_proj"])
 
 @dataclass
@@ -316,12 +315,23 @@ def train():
             lora_dropout=lora_args.lora_dropout,
             bias="none",
             task_type=TaskType.CAUSAL_LM,
-            init_lora_weights=lora_args.lora_init,
+            init_lora_weights=True if 'pissa' not in training_args.output_dir else 'pissa_niter_4',
+            use_dora=True if 'dora' in training_args.output_dir else False,
+            use_rslora=True if 'nolora+' not in training_args.output_dir else False,
         )
     
     model = get_peft_model(model, config)
     print(f"Trainable Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
-    trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, prepare_ratio=lora_args.prepare_ratio, **data_module)
+
+    if 'init' in training_args.output_dir:
+        assert training_args.max_steps > 0
+        trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
+        trainer.train()
+    else:
+        assert training_args.max_steps == -1
+
+    training_args.max_steps = -1
+    trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
 
     trainer.train()
 

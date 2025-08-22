@@ -46,6 +46,7 @@ def train(
         eval_step: int = 200,
         save_step: int = 200,
         seed: int = 42,
+        max_steps: int = -1,  # -1 means no max steps, train for num_epochs
         # lora hyperparams/params
         lora_r: int = 8,
         lora_alpha: int = 16,
@@ -220,10 +221,12 @@ def train(
             r=lora_r,
             lora_alpha=lora_alpha,
             target_modules=target_modules,
-            init_lora_weights=init_lora_weights,
             lora_dropout=lora_dropout,
             bias="none",
             task_type="CAUSAL_LM",
+            init_lora_weights=True if 'pissa' not in output_dir else 'pissa_niter_4',
+            use_dora=True if 'dora' in output_dir else False,
+            use_rslora=True if 'nolora+' not in output_dir else False,
         )
 
     model = get_peft_model(model, config)
@@ -274,6 +277,42 @@ def train(
         model.is_parallelizable = True
         model.model_parallel = True
 
+    if 'init' in output_dir:
+        assert max_steps > 0
+        trainer = Trainer(
+            model=model,
+            train_dataset=train_data,
+            eval_dataset=val_data,
+            args=transformers.TrainingArguments(
+                per_device_train_batch_size=micro_batch_size,
+                gradient_accumulation_steps=gradient_accumulation_steps,
+                warmup_steps=0,
+                num_train_epochs=num_epochs,
+                learning_rate=learning_rate,
+                fp16=True,
+                logging_steps=20,
+                optim="adamw_torch",
+                eval_strategy="epoch" if val_set_size > 0 else "no",
+                save_strategy="no",
+                output_dir=output_dir,
+                save_total_limit=3,
+                load_best_model_at_end=True if val_set_size > 0 else False,
+                ddp_find_unused_parameters=False if ddp else None,
+                group_by_length=group_by_length,
+                report_to="wandb" if use_wandb else None,
+                run_name=wandb_run_name if use_wandb else None,
+                max_steps=max_steps,
+            ),
+            data_collator=transformers.DataCollatorForSeq2Seq(
+                tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
+            ),
+        )
+        trainer.train()
+    else:
+        assert max_steps == -1
+    
+    max_steps = -1
+
     trainer = Trainer(
         model=model,
         train_dataset=train_data,
@@ -296,11 +335,11 @@ def train(
             group_by_length=group_by_length,
             report_to="wandb" if use_wandb else None,
             run_name=wandb_run_name if use_wandb else None,
+            max_steps=max_steps,
         ),
         data_collator=transformers.DataCollatorForSeq2Seq(
             tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
         ),
-        prepare_ratio=prepare_ratio,
     )
     model.config.use_cache = False
 

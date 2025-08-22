@@ -55,7 +55,6 @@ class ModelArguments:
 
     lora_r: int = field(default=16, metadata={"help": "Lora rank."})
     lora_alpha: float = field(default=16.0, metadata={"help": "Lora alpha."})
-    prepare_ratio: float = field(default=0)
 
     target_modules: List[str] = field(
         default_factory=list,
@@ -278,6 +277,9 @@ def train():
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM",
+        init_lora_weights=True if 'pissa' not in training_args.output_dir else 'pissa_niter_4',
+        use_dora=True if 'dora' in training_args.output_dir else False,
+        use_rslora=True if 'nolora+' not in training_args.output_dir else False,
     )
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
@@ -290,8 +292,16 @@ def train():
     elif data_args.dataset == 'alpaca':
         data_args.data_path = './alpaca_data.json'
         data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
-        
-    trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, prepare_ratio=model_args.prepare_ratio, **data_module)
+    
+    if 'init' in training_args.output_dir:
+        assert training_args.max_steps > 0
+        trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
+        trainer.train()
+    else:
+        assert training_args.max_steps == -1
+
+    training_args.max_steps = -1
+    trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
 
     trainer.train()
     trainer.save_state()

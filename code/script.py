@@ -2,53 +2,58 @@ import os
 
 gpu = input("Enter GPU ID: ")
 
-#model='llama2'
-model = 'llama3'
-if model == 'llama3':
-    model_name = 'meta-llama/Meta-Llama-3-8B'
-elif model == 'llama2':
-    model_name = "meta-llama/Llama-2-7b-hf"
+for model in ['llama3', 'gemma']:
 
-dataset = 'alpaca'
-#dataset = 'codefeedback'
+    if model == 'gemma':
+        base_model = 'google/gemma-2b'
+    elif model == 'llama3':
+        base_model = 'meta-llama/Meta-Llama-3-8B'
 
-ratio=0
-epoch = 3
-lr = 1e-3
-bs = 128
-r = 32
-for scale in [0.5,1,2]:
-    for target_modules in ['q_proj k_proj v_proj']:
-        target_modules_name = target_modules.replace(' ', '').replace('_proj','')
-        method = 'base'
-        seed = 1
+    dataset = 'alpaca'
+    #dataset = 'codefeedback'
 
-        output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_lr{lr}_r{r}_scale{scale}_seed{seed}_{method}_{target_modules_name}"
+    epoch = 3
+    lr = 5e-4
+    bs = 128
+    scale = 4
+    for seed in [1, 2, 3]:
+        for r in [8,16,32]:
+            for target_modules in ['q_proj k_proj v_proj']:
+                target_modules_name = target_modules.replace(' ', '').replace('_proj','')
+                
+                #for mode in ['base', 'pissa', 'dora', 'oursinit']:
+                for method in ['base']:
+                    if 'init' in method:
+                        max_steps = 50
+                    else:
+                        max_steps = -1
 
-        # Alpaca finetuning
-        os.system(
-            f"CUDA_VISIBLE_DEVICES={gpu} "
-            f"python run_exp.py "
-            f"--model_name_or_path {model_name} "
-            f"--dataset {dataset} "
-            f"--bf16 True "
-            f"--output_dir {output_dir} "
-            f"--num_train_epochs {epoch} "
-            f"--per_device_train_batch_size 4 "
-            f"--per_device_eval_batch_size {bs} "
-            f"--gradient_accumulation_steps {bs//4} "
-            f"--eval_strategy 'no' "
-            f"--save_strategy 'no' "
-            f"--learning_rate {lr} "
-            f"--weight_decay 0. "
-            f"--warmup_ratio 0 "
-            f"--lr_scheduler_type 'cosine' "
-            f"--logging_steps 50 "
-            f"--tf32 True "
-            f"--seed {seed} "
-            f"--lora_r {r} "
-            f"--lora_alpha {scale * r**0.5} "
-            f"--prepare_ratio {ratio} "
-            f"--target_modules {target_modules} "
-        )
+                output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_lr{lr}_r{r}_scale{scale}_seed{seed}_{method}_{target_modules_name}"
+
+                # Alpaca finetuning
+                os.system(
+                    f"CUDA_VISIBLE_DEVICES={gpu} "
+                    f"python run_exp.py "
+                    f"--model_name_or_path {base_model} "
+                    f"--dataset {dataset} "
+                    f"--bf16 True "
+                    f"--output_dir {output_dir} "
+                    f"--num_train_epochs {epoch} "
+                    f"--per_device_train_batch_size 4 "
+                    f"--per_device_eval_batch_size {bs} "
+                    f"--gradient_accumulation_steps {bs//4} "
+                    f"--eval_strategy 'no' "
+                    f"--save_strategy 'no' "
+                    f"--learning_rate {lr} "
+                    f"--weight_decay 0. "
+                    f"--warmup_ratio 0 "
+                    f"--lr_scheduler_type 'cosine' "
+                    f"--logging_steps 50 "
+                    f"--tf32 True "
+                    f"--seed {seed} "
+                    f"--lora_r {r} "
+                    f"--lora_alpha {scale} "
+                    f"--target_modules {target_modules} "
+                    f"--max_steps {max_steps} "
+                )
 

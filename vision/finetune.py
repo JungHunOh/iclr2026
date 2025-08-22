@@ -191,7 +191,7 @@ DATASET_NAME_TO_URL = {
     "sun397": "tanganke/sun397",
     "dtd": "tanganke/dtd",
     "cars": "tanganke/stanford_cars",
-    "cub200": "cassiekang/cub200_dataset"
+    "cub200": "cassiekang/cub200_dataset",
 }
 
 
@@ -339,13 +339,6 @@ class ScriptArguments:
         metadata={"help": "Initialize LoRA weights with base layer weights"},
     )
 
-    prepare_ratio: float = field(
-        default=0.0,
-        metadata={
-            "help": "Ratio of training steps to prepare LoRA weights (for OH scheduler)"
-        },
-    )
-
     lora_alpha: float = field(
         default=8, metadata={"help": "Lora alpha for LoRA or DoRA"}
     )
@@ -419,7 +412,9 @@ def main():
             modules_to_save=get_classifier_modules(model_name),
             bias="none",
             lora_dropout=0.1,
-            init_lora_weights=script_args.lora_init,
+            init_lora_weights=True if 'pissa' not in training_args.output_dir else 'pissa_niter_4',
+            use_dora=True if 'dora' in training_args.output_dir else False,
+            use_rslora=True if 'nolora+' not in training_args.output_dir else False,
         )
     elif script_args.finetuning_method == "dora":
         config = LoraConfig(
@@ -454,13 +449,6 @@ def main():
         peft_model = model
     else:
         peft_model = get_peft_model(model, config)
-        try:
-            if 'pissa' in script_args.lora_init:
-                for module in peft_model.modules():
-                    if hasattr(module, 'lora_A'):
-                        module.scaling['default'] = script_args.lora_alpha / script_args.lora_rank
-        except:
-            pass
 
     print_trainable_parameters(peft_model)
     params_dict = get_trainable_params_dict(peft_model)
@@ -493,41 +481,24 @@ def main():
         weight_decay=training_args.weight_decay,
     )
 
-    num_train_steps = (
-        len(dataset_train)
-        // training_args.per_device_train_batch_size
-        * training_args.num_train_epochs
-    )
-
-    # if script_args.finetuning_method == "oh":
-    #     assert script_args.prepare_ratio > 0
-    #     def lr_lambda(current_step):
-    #         fixed_steps = int(num_train_steps * script_args.prepare_ratio)
-    #         warmup_steps = int((num_train_steps-fixed_steps) * training_args.warmup_ratio)
-    #         if current_step < fixed_steps:
-    #             return 1.0
-    #         elif current_step < fixed_steps + warmup_steps:
-    #             return (current_step - fixed_steps) / max(1, warmup_steps)
-    #         else:
-    #             decay_steps = num_train_steps - fixed_steps
-    #             return max(
-    #                 1e-6,
-    #                 float(num_train_steps - current_step) / float(max(1, decay_steps)),
-    #             )
-    #     scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
-    # elif training_args.lr_scheduler_type == "cosine":
-    #     scheduler = get_cosine_schedule_with_warmup(
-    #         optimizer,
-    #         num_warmup_steps=int(num_train_steps * training_args.warmup_ratio),
-    #         num_training_steps=num_train_steps,
-    #     )
-    # elif training_args.lr_scheduler_type == "linear":
-    #     scheduler = get_linear_schedule_with_warmup(
-    #         optimizer,
-    #         num_warmup_steps=int(num_train_steps * training_args.warmup_ratio),
-    #         num_training_steps=num_train_steps,
-    #     )
-
+    if 'init' in training_args.output_dir:
+        assert training_args.max_steps > 0
+        args = TrainingArguments(**training_args.to_dict())
+        trainer = Trainer(
+            peft_model,
+            args,
+            optimizers=(optimizer, None),
+            train_dataset=dataset_train,
+            eval_dataset=dataset_val,
+            tokenizer=image_processor,
+            compute_metrics=compute_metrics,
+            data_collator=collate_fn,
+        )
+        trainer.train()
+    else:
+        assert training_args.max_steps == -1
+    
+    training_args.max_steps = -1
     args = TrainingArguments(**training_args.to_dict())
 
     trainer = Trainer(
@@ -539,7 +510,6 @@ def main():
         tokenizer=image_processor,
         compute_metrics=compute_metrics,
         data_collator=collate_fn,
-        prepare_ratio=script_args.prepare_ratio,
     )
 
     train_results = trainer.train()
