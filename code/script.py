@@ -17,18 +17,18 @@ for model in ['llama3', 'gemma']:
     bs = 128
     scale = 4
     for seed in [1, 2, 3]:
-        for r in [8,16,32]:
+        for r in [32]:
             for target_modules in ['q_proj k_proj v_proj']:
                 target_modules_name = target_modules.replace(' ', '').replace('_proj','')
                 
-                #for mode in ['base', 'pissa', 'dora', 'oursinit']:
-                for method in ['base']:
+                for mode in ['base', 'oursinit', 'pissa', 'dora']:
+                #for method in ['base']:
                     if 'init' in method:
                         max_steps = 50
                     else:
                         max_steps = -1
 
-                output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_lr{lr}_r{r}_scale{scale}_seed{seed}_{method}_{target_modules_name}"
+                output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_bs{bs}_lr{lr}_r{r}_scale{scale}_seed{seed}_{method}_{target_modules_name}"
 
                 # Alpaca finetuning
                 os.system(
