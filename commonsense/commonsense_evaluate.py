@@ -50,6 +50,7 @@ def eval(model, tokenizer, name):
         with torch.no_grad():
             generation_output = model.generate(
                 input_ids=input_ids,
+                attention_mask=inputs['attention_mask'].to(device),
                 generation_config=generation_config,
                 return_dict_in_generate=True,
                 output_scores=True,
@@ -64,13 +65,15 @@ def eval(model, tokenizer, name):
     model.eval()
     #tokenizer, model = load_model(args)
 
+    accs = []
+
     for ds in ["boolq", "piqa", "social_i_qa", "hellaswag", "winogrande", "ARC-Challenge", "ARC-Easy", "openbookqa"]:
         save_name=name
         save_file = f'experiment/{save_name}_{ds}.json'
         create_dir('experiment/')
 
         dataset = load_data(ds)
-        batches = create_batch(dataset, 1)
+        batches = create_batch(dataset, 50)
         total = len(batches)
         correct = 0
         current = 0
@@ -105,10 +108,13 @@ def eval(model, tokenizer, name):
             #    json.dump(output_data, f, indent=4)
             pbar.update(1)
         pbar.close()
-        with open(f'experiment/{save_name}_{ds}.txt', 'w+') as f:
-            f.write(f'\rtest:{idx + 1}/{total} | accuracy {correct}  {correct / (current)}')
+        with open(f'experiment/{save_name}.txt', 'a+') as f:
+            f.write(f'\rTask:{ds} test:{idx + 1}/{total} | accuracy {correct}  {correct / (current)}')
+            accs.append(correct / current)
         print('\n')
         print('test finished')
+    with open(f'experiment/{save_name}.txt', 'a+') as f:
+        f.write(f'\rAverage accuracy: {sum(accs) / len(accs)}\n')
 
 
 def create_dir(dir_path):
