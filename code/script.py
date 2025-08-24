@@ -13,15 +13,15 @@ for model in ['llama3', 'gemma']:
     #dataset = 'codefeedback'
 
     epoch = 3
-    lr = 5e-4
+    lr = 2e-4
     bs = 128
     scale = 4
     for seed in [1, 2, 3]:
         for r in [32]:
-            for target_modules in ['q_proj k_proj v_proj']:
+            for target_modules in ['q_proj k_proj v_proj down_proj up_proj']:
                 target_modules_name = target_modules.replace(' ', '').replace('_proj','')
                 
-                for mode in ['base', 'oursinit', 'pissa', 'dora']:
+                for method in ['base', 'oursinit', 'pissa', 'dora']:
                 #for method in ['base']:
                     if 'init' in method:
                         max_steps = 50

@@ -3,8 +3,8 @@ import json
 import glob
 
 #for dataset in ['resisc45', 'cifar100', 'sun397', 'cars', 'dtd', 'cub200', 'food101']:
-for dataset in ['cifar100', 'resisc45', 'food101', 'dtd', 'cub200', 'cars', 'sun397']:
-    for model in ['vit-base', 'vit-large']:
+for model in ['vit-base', 'vit-large']:
+    for dataset in ['cifar100', 'resisc45', 'food101', 'dtd', 'cub200', 'cars', 'sun397']:
         methods = ['base', 'pissa', 'dora', 'oursinit']
 
         rs = [32]

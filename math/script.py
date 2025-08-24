@@ -17,9 +17,9 @@ for model in ['gemma', 'llama3']:
 
     epoch=3
     for seed in [1,2,3]:
-        for target_modules in ['q_proj k_proj v_proj']:
+        for target_modules in ['q_proj k_proj v_proj down_proj up_proj']:
             target_modules_name = target_modules.replace(' ', '').replace('_proj','')
-            for lr in [5e-4]:
+            for lr in [2e-4]:
                 for r, scale in [(32,4)]:
                     #for mode in ['base', 'pissa', 'dora', 'oursinit']:
                     for method in ['base', 'oursinit']:

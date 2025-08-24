@@ -78,12 +78,14 @@ class CustomAdamW(torch.optim.AdamW):
                     else:
                         module.proj_a = module.detached_a.clone().contiguous()
                         module.proj_b = module.detached_b.clone().contiguous()
-                        torch.nn.init.zeros_(module.lora_A['default'].weight)
-                        torch.nn.init.zeros_(module.lora_B['default'].weight)
+                        module.lora_B['default'].weight.data = module.detached_b.clone().contiguous()
+                        module.lora_A['default'].weight.data = module.detached_a.clone().contiguous()
+                        #torch.nn.init.zeros_(module.lora_A['default'].weight)
+                        #torch.nn.init.zeros_(module.lora_B['default'].weight)
                         del module.prev_a
                         del module.prev_b
-                        del module.detached_a
-                        del module.detached_b
+                        #del module.detached_a
+                        #del module.detached_b
 
     def step(self, closure=None):
         loss = super().step(closure)
@@ -116,7 +118,7 @@ class CustomAdamW(torch.optim.AdamW):
                                     p.data = p_init.data.clone().contiguous()
                         self.state.clear()
 
-        if not self.before_init and 'ours' in self.mode and self._step_count > 10 and self._step_count % self.interval == 0:
+        if not self.before_init and 'ours' in self.mode and self._step_count % self.interval == 0:
             for module in self.model.modules():
                 if hasattr(module, 'lora_A'):
                     with torch.no_grad():
