@@ -82,15 +82,31 @@ class CustomAdamW(torch.optim.AdamW):
                         module.lora_A['default'].weight.data = module.detached_a.clone().contiguous()
                         #torch.nn.init.zeros_(module.lora_A['default'].weight)
                         #torch.nn.init.zeros_(module.lora_B['default'].weight)
+                        module.base_layer.weight.data = module.base_layer.weight - (module.detached_b @ module.detached_a).to(module.base_layer.weight.dtype) * module.scaling['default']
                         del module.prev_a
                         del module.prev_b
-                        #del module.detached_a
-                        #del module.detached_b
+                        del module.detached_a
+                        del module.detached_b
 
     def step(self, closure=None):
         loss = super().step(closure)
 
         self._step_count += 1
+
+        # if self._step_count % 10 == 0 and not self.before_init:
+        #     for module in self.model.modules():
+        #         if hasattr(module, 'lora_A'):
+        #             with torch.no_grad():
+        #                 if module.layer_idx % 2 == 0:
+        #                     lora_A = module.lora_A['default'].weight
+        #                     lora_B = module.lora_B['default'].weight
+        #                     u, s, v = torch.svd_lowrank(lora_B @ lora_A, q=module.lora_A['default'].weight.shape[0], niter=4)
+        #                     rank1 = (u[:,0:1] @ v[:,0:1].T).reshape(-1)
+        #                     cos = []
+        #                     for j in range(lora_A.shape[0]):
+        #                         ba = (lora_B[:,j:j+1] @ lora_A[j:j+1,:]).reshape(-1)
+        #                         cos.append(torch.dot(ba, rank1) / (torch.norm(ba) * torch.norm(rank1)))
+        #                     print(module.layer_idx,'cosine similarity:', torch.mean(torch.tensor(cos)).item())
 
         if self._step_count % 10 == 0 and self.before_init:
             for module in self.model.modules():

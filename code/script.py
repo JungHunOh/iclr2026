@@ -15,6 +15,7 @@ for model in ['llama3', 'gemma']:
     epoch = 3
     lr = 2e-4
     bs = 128
+    mini_bs=4 if model == 'llama3' else 8
     scale = 4
     for seed in [1, 2, 3]:
         for r in [32]:
@@ -39,9 +40,9 @@ for model in ['llama3', 'gemma']:
                     f"--bf16 True "
                     f"--output_dir {output_dir} "
                     f"--num_train_epochs {epoch} "
-                    f"--per_device_train_batch_size 4 "
+                    f"--per_device_train_batch_size {mini_bs} "
                     f"--per_device_eval_batch_size {bs} "
-                    f"--gradient_accumulation_steps {bs//4} "
+                    f"--gradient_accumulation_steps {bs//mini_bs} "
                     f"--eval_strategy 'no' "
                     f"--save_strategy 'no' "
                     f"--learning_rate {lr} "

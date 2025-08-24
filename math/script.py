@@ -15,6 +15,12 @@ for model in ['gemma', 'llama3']:
     bs=128
     mini_bs=8 if model == 'llama3' else 16
 
+    dataset = 'metamath395'
+    if dataset == 'metamath395':
+        dataset_name = 'MetaMathQA-395K'
+    elif dataset == 'metamath':
+        dataset_name = 'MetaMathQA-40K'
+
     epoch=3
     for seed in [1,2,3]:
         for target_modules in ['q_proj k_proj v_proj down_proj up_proj']:
@@ -29,10 +35,10 @@ for model in ['gemma', 'llama3']:
                             max_steps = -1
                         os.system(f'CUDA_VISIBLE_DEVICES={gpu} python train_math.py \
                             --model_name_or_path {base_model}\
-                            --data_path ft-training_set/MetaMathQA-40K.json \
+                            --data_path ft-training_set/{dataset_name}.json \
                             --data_length 10000000 \
                             --bf16 True \
-                            --output_dir ./trained_models/{model}_metamath_epoch{epoch}_bs{bs}_r{r}_scale{scale}_lr{lr}_seed{seed}_{method}_{target_modules_name}/\
+                            --output_dir ./trained_models/{model}_{dataset}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_lr{lr}_seed{seed}_{method}_{target_modules_name}/\
                             --per_device_train_batch_size {mini_bs} \
                             --per_device_eval_batch_size 4 \
                             --gradient_accumulation_steps {bs//mini_bs} \
