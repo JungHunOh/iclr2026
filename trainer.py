@@ -84,7 +84,7 @@ class CustomAdamW(torch.optim.AdamW):
                         module.lora_A['default'].weight.data = module.detached_a.clone().contiguous()
                         del module.prev_a
                         del module.prev_b
-                    elif self.mode == 'oursinitone':
+                    elif 'oursinitone' in self.mode:
                         module.do_one = True
                         module.proj_a = module.detached_a.clone().contiguous()
                         module.proj_b = module.detached_b.clone().contiguous()
