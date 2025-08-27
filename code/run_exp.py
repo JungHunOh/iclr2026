@@ -177,7 +177,7 @@ class SupervisedHFDataset(Dataset):
 
     def __init__(self, hf_dataset, tokenizer: transformers.PreTrainedTokenizer):
         super().__init__()
-        hy_dataset = hf_dataset.shuffle(seed=42)[:100000]
+        hf_dataset = hf_dataset.shuffle(seed=42)[:100000]
 
         hf_dataset = hf_dataset.rename_column("query", "instruction")
         hf_dataset = hf_dataset.rename_column("answer", "output")
