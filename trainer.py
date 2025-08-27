@@ -8,15 +8,6 @@ class CustomLoRATrainer(Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
-    def _get_train_sampler(self, train_dataset=None):
-        if self.args.max_steps > 0 or not hasattr(self, 'do_random_sampler'):
-            if train_dataset is None:
-                train_dataset = self.train_dataset
-            self.do_random_sampler = True
-            return SequentialSampler(self.train_dataset)
-        else:
-            return super()._get_train_sampler(train_dataset)
-
     def create_optimizer_and_scheduler(self, num_training_steps: int):
         """
         Setup the optimizer and the learning rate scheduler.

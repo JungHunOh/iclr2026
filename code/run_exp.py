@@ -166,9 +166,6 @@ class SupervisedDataset(Dataset):
         return len(self.input_ids)
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
-        if isinstance(i, slice):
-            # Support slicing
-            return [dict(input_ids=self.input_ids[j], labels=self.labels[j]) for j in range(*i.indices(len(self)))]
         return dict(input_ids=self.input_ids[i], labels=self.labels[i])
 
 
@@ -200,9 +197,6 @@ class SupervisedHFDataset(Dataset):
         return len(self.input_ids)
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
-        if isinstance(i, slice):
-            # Support slicing
-            return [dict(input_ids=self.input_ids[j], labels=self.labels[j]) for j in range(*i.indices(len(self)))]
         return dict(input_ids=self.input_ids[i], labels=self.labels[i])
 
 
@@ -300,12 +294,7 @@ def train():
     
     if 'init' in training_args.output_dir:
         assert training_args.max_steps > 0
-        import copy
-        tmp_training_args = copy.deepcopy(training_args)
-        tmp_training_args.num_train_epochs = 5
-        tmp_data_module = copy.deepcopy(data_module)
-        tmp_data_module['train_dataset'] = tmp_data_module['train_dataset'][:10*tmp_training_args.per_device_train_batch_size*tmp_training_args.gradient_accumulation_steps]
-        trainer = Trainer(model=model, tokenizer=tokenizer, args=tmp_training_args, **tmp_data_module)
+        trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
         trainer.train()
     else:
         assert training_args.max_steps == -1

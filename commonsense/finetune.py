@@ -281,13 +281,13 @@ def train(
         assert max_steps > 0
         trainer = Trainer(
             model=model,
-            train_dataset=train_data.select(range(10*micro_batch_size*gradient_accumulation_steps)),
+            train_dataset=train_data,
             eval_dataset=val_data,
             args=transformers.TrainingArguments(
                 per_device_train_batch_size=micro_batch_size,
                 gradient_accumulation_steps=gradient_accumulation_steps,
                 warmup_steps=0,
-                num_train_epochs=5,
+                num_train_epochs=num_epochs,
                 learning_rate=learning_rate,
                 fp16=True,
                 logging_steps=20,

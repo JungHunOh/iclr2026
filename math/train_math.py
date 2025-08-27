@@ -188,7 +188,9 @@ class SupervisedDataset(Dataset):
         list_data_dict = random.sample(list_data_dict,  len(list_data_dict))
         list_data_dict = list_data_dict[:data_args.data_length]
 
+        # logging.warning("Formatting inputs...")
         prompt_input, prompt_no_input = PROMPT_DICT["prompt_input"], PROMPT_DICT["prompt_no_input"]
+        # print(list_data_dict[0])
         if 'instruction' in list_data_dict[0]:
             pass
         else:
@@ -197,6 +199,7 @@ class SupervisedDataset(Dataset):
                     return ''
                 return '\n'.join(query.split('\n')[1:])
             list_data_dict = [{'instruction':data['query'].split('\n')[0], 'input':get_input(data['query']), 'output':data['response']} for data in list_data_dict]
+        # import ipdb; ipdb.set_trace()
         sources = [
             prompt_input.format_map(example) if example.get("input", "") != "" else prompt_no_input.format_map(example)
             for example in list_data_dict
@@ -213,12 +216,6 @@ class SupervisedDataset(Dataset):
         return dict(input_ids=self.input_ids[i], labels=self.labels[i])
 
     def __getitem__(self, i):
-        if isinstance(i, slice):
-            # Return a new SupervisedDataset with sliced data
-            new_dataset = copy.copy(self)
-            new_dataset.sources = self.sources[i]
-            new_dataset.targets = self.targets[i]
-            return new_dataset
         return dict(input_ids=self.sources[i], labels=self.targets[i])
 
 @dataclass
@@ -328,12 +325,7 @@ def train():
 
     if 'init' in training_args.output_dir:
         assert training_args.max_steps > 0
-        import copy
-        tmp_training_args = copy.deepcopy(training_args)
-        tmp_training_args.num_train_epochs = 5
-        tmp_data_module = copy.deepcopy(data_module)
-        tmp_data_module['train_dataset'] = tmp_data_module['train_dataset'][:10*tmp_training_args.per_device_train_batch_size*tmp_training_args.gradient_accumulation_steps]
-        trainer = Trainer(model=model, tokenizer=tokenizer, args=tmp_training_args, **tmp_data_module)
+        trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
         trainer.train()
     else:
         assert training_args.max_steps == -1
