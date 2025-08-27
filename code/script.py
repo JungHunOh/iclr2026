@@ -29,32 +29,33 @@ for model in ['llama3', 'gemma']:
                     else:
                         max_steps = -1
 
-                output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_bs{bs}_lr{lr}_r{r}_scale{scale}_seed{seed}_{method}_{target_modules_name}"
+                    output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_bs{bs}_lr{lr}_r{r}_scale{scale}_seed{seed}_{method}_{target_modules_name}"
 
-                # Alpaca finetuning
-                os.system(
-                    f"CUDA_VISIBLE_DEVICES={gpu} "
-                    f"python run_exp.py "
-                    f"--model_name_or_path {base_model} "
-                    f"--dataset {dataset} "
-                    f"--bf16 True "
-                    f"--output_dir {output_dir} "
-                    f"--num_train_epochs {epoch} "
-                    f"--per_device_train_batch_size {mini_bs} "
-                    f"--per_device_eval_batch_size {bs} "
-                    f"--gradient_accumulation_steps {bs//mini_bs} "
-                    f"--eval_strategy 'no' "
-                    f"--save_strategy 'no' "
-                    f"--learning_rate {lr} "
-                    f"--weight_decay 0. "
-                    f"--warmup_ratio 0 "
-                    f"--lr_scheduler_type 'cosine' "
-                    f"--logging_steps 50 "
-                    f"--tf32 True "
-                    f"--seed {seed} "
-                    f"--lora_r {r} "
-                    f"--lora_alpha {scale} "
-                    f"--target_modules {target_modules} "
-                    f"--max_steps {max_steps} "
-                )
-
+                    # Alpaca finetuning
+                    os.system(
+                        f"CUDA_VISIBLE_DEVICES={gpu} "
+                        f"python run_exp.py "
+                        f"--model_name_or_path {base_model} "
+                        f"--dataset {dataset} "
+                        f"--bf16 True "
+                        f"--output_dir {output_dir} "
+                        f"--num_train_epochs {epoch} "
+                        f"--per_device_train_batch_size {mini_bs} "
+                        f"--per_device_eval_batch_size {bs} "
+                        f"--gradient_accumulation_steps {bs//mini_bs} "
+                        f"--eval_strategy 'no' "
+                        f"--save_strategy 'no' "
+                        f"--learning_rate {lr} "
+                        f"--weight_decay 0. "
+                        f"--warmup_ratio 0 "
+                        f"--lr_scheduler_type 'cosine' "
+                        f"--logging_steps 50 "
+                        f"--tf32 True "
+                        f"--seed {seed} "
+                        f"--lora_r {r} "
+                        f"--lora_alpha {scale} "
+                        f"--target_modules {target_modules} "
+                        f"--max_steps {max_steps} "
+                    )
+                    print(output_dir)
+input()

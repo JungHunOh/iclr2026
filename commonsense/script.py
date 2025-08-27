@@ -14,7 +14,7 @@ for model in ['gemma','llama3']:
         base_model = 'meta-llama/Meta-Llama-3-8B'
     
     lr=2e-4
-    epoch=4
+    epoch=3
     bs=128
     mini_bs=16 if model == 'llama3' else 32
     scale=4
@@ -48,3 +48,5 @@ for model in ['gemma','llama3']:
                     f'--max_steps {max_steps} '
                 )
                 os.system(cmd)
+                print(f'./trained_models/{model}_{dataset}_lr{lr}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_{method}_seed{seed}')
+input()

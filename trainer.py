@@ -2,10 +2,20 @@ from transformers import Trainer
 import torch
 import math
 import random
+from torch.utils.data import SequentialSampler
 
 class CustomLoRATrainer(Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+    
+    def _get_train_sampler(self, train_dataset=None):
+        if self.args.max_steps > 0 or not hasattr(self, 'do_random_sampler'):
+            if train_dataset is None:
+                train_dataset = self.train_dataset
+            self.do_random_sampler = True
+            return SequentialSampler(self.train_dataset)
+        else:
+            return super()._get_train_sampler(train_dataset)
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
         """
@@ -61,7 +71,6 @@ class CustomAdamW(torch.optim.AdamW):
             self.classifier_params = [p for p in self.model.classifier.parameters() if p.requires_grad]
         elif hasattr(self.model, 'classification_head'):
             self.classifier_params = [p for p in self.model.classification_head.parameters() if p.requires_grad]
-            self.classifier_params = [p for p in self.model.classifier.parameters() if p.requires_grad]
 
         layer = 0
         for module in self.model.modules():
@@ -75,6 +84,17 @@ class CustomAdamW(torch.optim.AdamW):
                         module.lora_A['default'].weight.data = module.detached_a.clone().contiguous()
                         del module.prev_a
                         del module.prev_b
+                    elif self.mode == 'oursinitone':
+                        module.do_one = True
+                        module.proj_a = module.detached_a.clone().contiguous()
+                        module.proj_b = module.detached_b.clone().contiguous()
+                        module.lora_B['default'].weight.data = module.detached_b.clone().contiguous()
+                        module.lora_A['default'].weight.data = module.detached_a.clone().contiguous()
+                        module.base_layer.weight.data = module.base_layer.weight - (module.detached_b @ module.detached_a).to(module.base_layer.weight.dtype) * module.scaling['default'] * 2
+                        del module.prev_a
+                        del module.prev_b
+                        del module.detached_a
+                        del module.detached_b
                     else:
                         module.proj_a = module.detached_a.clone().contiguous()
                         module.proj_b = module.detached_b.clone().contiguous()

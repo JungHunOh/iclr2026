@@ -483,12 +483,15 @@ def main():
 
     if 'init' in training_args.output_dir:
         assert training_args.max_steps > 0
-        args = TrainingArguments(**training_args.to_dict())
+        import copy
+        tmp_training_args = copy.deepcopy(training_args)
+        tmp_training_args.num_train_epochs = 5
+        args = TrainingArguments(**tmp_training_args.to_dict())
         trainer = Trainer(
             peft_model,
             args,
             optimizers=(optimizer, None),
-            train_dataset=dataset_train,
+            train_dataset=dataset_train.select(range(10*args.per_device_train_batch_size*args.gradient_accumulation_steps)),
             eval_dataset=dataset_val,
             tokenizer=image_processor,
             compute_metrics=compute_metrics,

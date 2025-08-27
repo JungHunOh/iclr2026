@@ -325,7 +325,12 @@ def train():
 
     if 'init' in training_args.output_dir:
         assert training_args.max_steps > 0
-        trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
+        import copy
+        tmp_training_args = copy.deepcopy(training_args)
+        tmp_training_args.num_train_epochs = 5
+        tmp_data_module = copy.deepcopy(data_module)
+        tmp_data_module['train_dataset'] = tmp_data_module['train_dataset'].select(range(10*tmp_training_args.per_device_train_batch_size*tmp_training_args.gradient_accumulation_steps))
+        trainer = Trainer(model=model, tokenizer=tokenizer, args=tmp_training_args, **tmp_data_module)
         trainer.train()
     else:
         assert training_args.max_steps == -1

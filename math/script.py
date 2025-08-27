@@ -57,3 +57,5 @@ for model in ['gemma', 'llama3']:
                             --seed {seed}\
                             --lora_dropout 0.05\
                                 ')
+                        print(f'./trained_models/{model}_{dataset}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_lr{lr}_seed{seed}_{method}_{target_modules_name}/')
+input()
