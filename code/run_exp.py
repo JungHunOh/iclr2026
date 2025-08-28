@@ -316,8 +316,10 @@ def train():
         os.system(f"python process_jsonl.py {dir}")
         os.system(f"python eval_human.py {dir.replace('.jsonl', '_modified.jsonl')}")
     elif data_args.dataset == "alpaca":
-        import eval_mmlu
-        eval_mmlu.main(model, tokenizer, training_args.output_dir)
+        #import eval_mmlu
+        #eval_mmlu.main(model, tokenizer, training_args.output_dir)
+        from alpaca_eval import eval
+        eval(model, tokenizer, training_args.output_dir)
 
 if __name__ == "__main__":
     train()
