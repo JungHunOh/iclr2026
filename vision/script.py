@@ -1,8 +1,8 @@
 import os
 import math
 
-#os.environ["NCCL_P2P_DISABLE"] = "1"
-#os.environ["NCCL_IB_DISABLE"] = "1"
+os.environ["NCCL_P2P_DISABLE"] = "1"
+os.environ["NCCL_IB_DISABLE"] = "1"
 
 cuda_visible_devices = input()  # Set your desired GPU index here
 
@@ -38,8 +38,8 @@ for model in ['vit-base', 'vit-large']:
             target_modules_name = target_modules.replace(' ', '')
 
             for seed in [1,2,3]:
-                #for mode in ['base', 'pissa', 'dora', 'oursinit']:
-                for mode in ['base']:
+                for mode in ['base', 'pissa', 'dora', 'oursinitone']:
+                #for mode in ['base']:
                     for r in [8,16,32]:
                         for scale in [4]:
                             if 'init' in mode:
@@ -73,5 +73,6 @@ for model in ['vit-base', 'vit-large']:
                                 f"--lora_alpha {scale} "
                                 f"--target_modules {target_modules} "
                                 f"--max_steps {max_steps} "
+                                f" > {output_dir}/log.txt"
                             )
                             os.system(cmd)
