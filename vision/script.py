@@ -48,13 +48,14 @@ for model in ['vit-base', 'vit-large']:
                                 max_steps = -1
                             
                             output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_bs{bs}_lr{lr}_alpha{scale}_r{r}_{mode}_{target_modules_name}/"
+                            os.makedirs(output_dir, exist_ok=True)
                             cmd = (
                                 f"python finetune.py "
                                 f"--eval_strategy no "
                                 f"--save_strategy no "
                                 f"--gradient_accumulation_steps {bs//mini_bs} "
                                 f"--dataloader_num_workers 8 "
-                                f"--logging_steps 50 "
+                                f"--logging_steps 10 "
                                 f"--label_names labels "
                                 f"--remove_unused_columns False "
                                 f"--per_device_train_batch_size {mini_bs} "
