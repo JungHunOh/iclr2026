@@ -30,7 +30,7 @@ for model in ['llama3', 'gemma']:
                         max_steps = -1
 
                     output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_bs{bs}_lr{lr}_r{r}_scale{scale}_seed{seed}_{method}_{target_modules_name}"
-
+                    os.makedirs(output_dir, exist_ok=True)
                     # Alpaca finetuning
                     os.system(
                         f"CUDA_VISIBLE_DEVICES={gpu} "
@@ -56,6 +56,7 @@ for model in ['llama3', 'gemma']:
                         f"--lora_alpha {scale} "
                         f"--target_modules {target_modules} "
                         f"--max_steps {max_steps} "
+                        f"| tee {output_dir}/log.txt"
                     )
                     print(output_dir)
 input()

@@ -33,6 +33,7 @@ for model in ['gemma', 'llama3']:
                             max_steps = 50
                         else:
                             max_steps = -1
+                        os.makedirs(f'./trained_models/{model}_{dataset}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_lr{lr}_seed{seed}_{method}_{target_modules_name}/', exist_ok=True)
                         os.system(f'CUDA_VISIBLE_DEVICES={gpu} python train_math.py \
                             --model_name_or_path {base_model}\
                             --data_path ft-training_set/{dataset_name}.json \
@@ -56,6 +57,7 @@ for model in ['gemma', 'llama3']:
                             --lora_alpha {scale}\
                             --seed {seed}\
                             --lora_dropout 0.05\
+                            | tee ./trained_models/{model}_{dataset}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_lr{lr}_seed{seed}_{method}_{target_modules_name}/log.txt\
                                 ')
                         print(f'./trained_models/{model}_{dataset}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_lr{lr}_seed{seed}_{method}_{target_modules_name}/')
 input()

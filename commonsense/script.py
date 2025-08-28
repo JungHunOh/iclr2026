@@ -29,6 +29,7 @@ for model in ['gemma','llama3']:
                     max_steps = 50
                 else:
                     max_steps = -1
+                os.makedirs(f'./trained_models/{model}_{dataset}_lr{lr}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_{method}_seed{seed}/', exist_ok=True)
                 cmd = (
                     f'CUDA_VISIBLE_DEVICES={gpu} python finetune.py '
                     f'--base_model {base_model} '
@@ -46,6 +47,7 @@ for model in ['gemma','llama3']:
                     f'--target_modules "{",".join(target_modules)}" '
                     f'--seed {seed} '
                     f'--max_steps {max_steps} '
+                    f'| tee ./trained_models/{model}_{dataset}_lr{lr}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_{method}_seed{seed}/log.txt'
                 )
                 os.system(cmd)
                 print(f'./trained_models/{model}_{dataset}_lr{lr}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_{method}_seed{seed}')

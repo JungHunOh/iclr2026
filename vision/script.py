@@ -74,6 +74,6 @@ for model in ['vit-base', 'vit-large']:
                                 f"--lora_alpha {scale} "
                                 f"--target_modules {target_modules} "
                                 f"--max_steps {max_steps} "
-                                f" > {output_dir}/log.txt"
+                                f"| tee {output_dir}/log.txt"
                             )
                             os.system(cmd)
