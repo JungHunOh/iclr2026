@@ -483,7 +483,7 @@ def main():
 
     if 'init' in training_args.output_dir:
         assert training_args.max_steps > 0
-        args = TrainingArguments(**tmp_training_args.to_dict())
+        args = TrainingArguments(**training_args.to_dict())
         trainer = Trainer(
             peft_model,
             args,
