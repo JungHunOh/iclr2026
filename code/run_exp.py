@@ -306,6 +306,8 @@ def train():
     trainer.save_state()
     trainer.save_model(output_dir=training_args.output_dir)
 
+    model.eval()
+
     if data_args.dataset == 'codefeedback':
         from eval_humaneval import main as eval_humaneval
         import os
