@@ -22,19 +22,51 @@ class CustomLoRATrainer(Trainer):
         param_groups = self.optimizer.param_groups
         assert len(param_groups) > 0
 
-        # Copy all param_groups to the new optimizer
+
+        if 'lora+' in self.args.output_dir:
+            lora_A_params = []
+            lora_B_params = []
+            for group in param_groups:
+                if len(group['params']) > 10:
+                    for p in group['params']:
+                        if hasattr(p, 'shape') and len(p.shape) == 2:
+                            if p.shape[0] < p.shape[1]:
+                                lora_A_params.append(p)
+                            else:
+                                lora_B_params.append(p)
+            
         new_param_groups = []
         for group in param_groups:
-            group_copy = {
-                'params': group['params'],
-                'lr': group.get('lr', 1e-3),
-                'betas': group.get('betas', (0.9, 0.999)),
-                'eps': group.get('eps', 1e-8),
-                'weight_decay': group.get('weight_decay', 0.0),
-                'amsgrad': getattr(self.optimizer, 'amsgrad', False)
-            }
-            new_param_groups.append(group_copy)
-        
+            if len(group['params']) > 10 and 'lora+' in self.args.output_dir:
+                group_copy_a = {
+                    'params': lora_A_params,
+                    'lr': group.get('lr', 1e-3),
+                    'betas': group.get('betas', (0.9, 0.999)),
+                    'eps': group.get('eps', 1e-8),
+                    'weight_decay': group.get('weight_decay', 0.0),
+                    'amsgrad': getattr(self.optimizer, 'amsgrad', False)
+                }
+                new_param_groups.append(group_copy_a)
+                group_copy_b = {
+                    'params': lora_B_params,
+                    'lr': group.get('lr', 1e-3) * 4,
+                    'betas': group.get('betas', (0.9, 0.999)),
+                    'eps': group.get('eps', 1e-8),
+                    'weight_decay': group.get('weight_decay', 0.0),
+                    'amsgrad': getattr(self.optimizer, 'amsgrad', False)
+                }
+                new_param_groups.append(group_copy_b)
+            else:
+                group_copy = {
+                    'params': group['params'],
+                    'lr': group.get('lr', 1e-3),
+                    'betas': group.get('betas', (0.9, 0.999)),
+                    'eps': group.get('eps', 1e-8),
+                    'weight_decay': group.get('weight_decay', 0.0),
+                    'amsgrad': getattr(self.optimizer, 'amsgrad', False)
+                }
+                new_param_groups.append(group_copy)
+
         mode = self.args.output_dir.split('_')[-2]
         assert type(self.optimizer) is torch.optim.AdamW, "only support AdamW optimizer"
         self.optimizer = CustomAdamW(

@@ -415,7 +415,6 @@ def main():
             init_lora_weights=True if 'pissa' not in training_args.output_dir else 'pissa_niter_4',
             use_dora=True if 'dora' in training_args.output_dir else False,
             use_rslora=True if 'norslora' not in training_args.output_dir else False,
-            loraplus_lr_ratio=4.0 if 'lora+' in training_args.output_dir else 1.0,
         )
     elif script_args.finetuning_method == "dora":
         config = LoraConfig(

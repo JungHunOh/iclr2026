@@ -38,11 +38,11 @@ for model in ['vit-base', 'vit-large']:
             target_modules_name = target_modules.replace(' ', '')
 
             for seed in [1,2,3]:
-                for mode in ['base', 'pissa', 'dora', 'oursinitone']:
+                for mode in ['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']:
                 #for mode in ['base']:
-                    for r in [8,16,32]:
+                    for r in [8,32]:
                         for scale in [4]:
-                            if 'init' in mode:
+                            if 'odlora' in mode:
                                 max_steps = 50
                             else:
                                 max_steps = -1
