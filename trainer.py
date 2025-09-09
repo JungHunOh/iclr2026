@@ -190,7 +190,7 @@ class CustomAdamW(torch.optim.AdamW):
                             module.lora_A['default'].weight.data = 0.5 * (torch.diag(s) @ v.T).clone().contiguous()
                             module.lora_B['default'].weight.data = 0.5 * (u @ torch.diag(s)).clone().contiguous()
                             self.state.clear()
-                        elif self._step_count > 10 and self._step_count % (self._step_count // (self.total_steps//5) + 1):
+                        elif self._step_count > 10 and self._step_count % (self._step_count // (self.total_steps//5) + 1)==0:
                             if (torch.norm(module.lora_B['default'].weight, dim=0) > 1e-2).all() and (torch.norm(module.lora_A['default'].weight, dim=1) > 1e-2).all():
                                 Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
                                 Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
