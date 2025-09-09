@@ -241,6 +241,7 @@ def train():
     torch.manual_seed(training_args.seed)
     torch.cuda.manual_seed(training_args.seed)
 
+    
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
@@ -250,7 +251,7 @@ def train():
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
         model_max_length=training_args.model_max_length,
-        padding_side="right",
+        padding_side="left",
         use_fast=False,
     )
     special_tokens_dict = dict()
@@ -278,7 +279,7 @@ def train():
         task_type="CAUSAL_LM",
         init_lora_weights=True if 'pissa' not in training_args.output_dir else 'pissa_niter_4',
         use_dora=True if 'dora' in training_args.output_dir else False,
-        use_rslora=True if 'nolora+' not in training_args.output_dir else False,
+        use_rslora=True if 'norslora' not in training_args.output_dir else False,
     )
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
@@ -292,7 +293,7 @@ def train():
         data_args.data_path = './alpaca_data.json'
         data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
     
-    if 'init' in training_args.output_dir:
+    if 'odlora' in training_args.output_dir:
         assert training_args.max_steps > 0
         trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
         trainer.train()
@@ -315,8 +316,7 @@ def train():
 
         dir = os.path.join(training_args.output_dir, "humaneval_samples.jsonl")
 
-        os.system(f"python process_jsonl.py {dir}")
-        os.system(f"python eval_human.py {dir.replace('.jsonl', '_modified.jsonl')}")
+        os.system(f"python eval_human.py {dir}")
     elif data_args.dataset == "alpaca":
         #import eval_mmlu
         #eval_mmlu.main(model, tokenizer, training_args.output_dir)

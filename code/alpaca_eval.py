@@ -11,27 +11,11 @@ from peft import PeftModel
 # --- Constants ---
 DATASET_NAME = "tatsu-lab/alpaca_eval"
 DATASET_CONFIG = "alpaca_eval"
-
-def apply_chat_template(tokenizer, instruction):
-    """
-    Applies the correct chat template based on the tokenizer.
-    Supports Llama 3 and Gemma chat templates.
-    """
-    # Llama 3 uses a specific chat template format.
-    if "Llama-3" in tokenizer.name_or_path or "llama3" in tokenizer.name_or_path.lower():
-        messages = [{"role": "user", "content": instruction}]
-        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    # Gemma uses a different turn-based format.
-    elif "gemma" in tokenizer.name_or_path.lower():
-        messages = [{"role": "user", "content": instruction}]
-        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    else:
-        # Fallback for other models, may need adjustment.
-        print("Warning: Model type not explicitly recognized. Using a generic user/assistant template.")
-        prompt = f"User: {instruction}\nAssistant:"
-
-    return prompt
-
+PROMPT = (
+        "Below is an instruction that describes a task. "
+        "Write a response that appropriately completes the request.\n\n"
+        "### Instruction:\n{instruction}\n\n### Response:"
+    )
 
 def eval(model, tokenizer, dir):
     save_dir = dir+'/alpaca_eval_outputs.json'
@@ -40,15 +24,13 @@ def eval(model, tokenizer, dir):
     # --- 2. Load Dataset ---
     print("Loading AlpacaEval dataset...")
     dataset = load_dataset(DATASET_NAME, DATASET_CONFIG)["eval"]
+    dataset = dataset.map(lambda example: {"instruction": PROMPT.format(instruction=example["instruction"])})
 
     # --- 3. Generate Outputs ---
     model_outputs = []
     print(f"\nStarting generation on {len(dataset)} examples...")
 
-    if 'gemma' in dir:
-        batch_size = 300
-    else:
-        batch_size = 50
+    batch_size = 50
     num_batches = math.ceil(len(dataset) / batch_size)
     print(f"\nStarting generation on {len(dataset)} examples in {num_batches} batches...")
 
@@ -62,9 +44,9 @@ def eval(model, tokenizer, dir):
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=2048,
+                max_new_tokens=256,
                 do_sample=False,  # Use greedy decoding for reproducibility
-                pad_token_id=tokenizer.eos_token_id
+                pad_token_id=tokenizer.pad_token_id
             )
 
         # Decode the batch of generated texts
@@ -74,10 +56,12 @@ def eval(model, tokenizer, dir):
 
         # Append results for the current batch
         for instruction, response_text in zip(instruction_batch, decoded_texts):
+            # Remove the template parts from instruction to keep only the original instruction text
+            original_instruction = instruction.split("### Instruction:")[-1].split("### Response:")[0].strip()
             model_outputs.append({
-                "instruction": instruction,
+                "instruction": original_instruction,
                 "output": response_text.strip(),
-                "generator": 'my_model'
+                "generator": dir
             })
 
     # --- 4. Save Outputs ---

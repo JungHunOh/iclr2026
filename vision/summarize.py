@@ -3,11 +3,11 @@ import json
 import glob
 
 #for dataset in ['resisc45', 'cifar100', 'sun397', 'cars', 'dtd', 'cub200', 'food101']:
-for model in ['vit-base', 'vit-large']:
+for model in ['vit-base']:
     for dataset in ['cifar100', 'resisc45', 'food101', 'dtd', 'cub200', 'cars', 'sun397']:
-        methods = ['base', 'pissa', 'dora', 'oursinit']
+        methods = ['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']
 
-        rs = [32]
+        rs = [8]
 
         dirs = []
         results = {}
@@ -35,6 +35,7 @@ for model in ['vit-base', 'vit-large']:
                 if float(scale[5:]) not in scales: continue
                 if method not in methods: continue
                 if int(r.replace('r','')) not in rs: continue
+                if 'bs256' not in dir: continue
             except:
                 continue
             

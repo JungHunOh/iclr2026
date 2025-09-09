@@ -13,19 +13,23 @@ for model in ['gemma','llama3']:
     elif model == 'llama3':
         base_model = 'meta-llama/Meta-Llama-3-8B'
     
-    lr=2e-4
-    epoch=3
-    bs=128
+    epoch=1
+    bs=32
     mini_bs=16 if model == 'llama3' else 32
     scale=4
 
-    target_modules=["q_proj", "k_proj", "v_proj", "down_proj", "up_proj"]
+    if model == 'llama3':
+        lr=1e-4
+    elif model == 'gemma':
+        lr=2e-4
+
+    target_modules=["q_proj", "k_proj", "v_proj", "down_proj", "up_proj", "gate_proj", "o_proj"]
 
     for seed in [1,2,3]:
-        #for mode in ['base', 'pissa', 'dora', 'oursinit']:
-        for method in ['base','oursinit']:
+        #for method in ['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']:
+        for method in ['base','odlora']:
             for r in [32]:
-                if 'init' in method:
+                if 'odlora' in method:
                     max_steps = 50
                 else:
                     max_steps = -1

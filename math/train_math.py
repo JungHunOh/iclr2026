@@ -288,7 +288,7 @@ def train():
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
         model_max_length=training_args.model_max_length,
-        padding_side="right",
+        padding_side="left",
         use_fast=False,
     )
     if tokenizer.pad_token is None:
@@ -317,13 +317,13 @@ def train():
             task_type=TaskType.CAUSAL_LM,
             init_lora_weights=True if 'pissa' not in training_args.output_dir else 'pissa_niter_4',
             use_dora=True if 'dora' in training_args.output_dir else False,
-            use_rslora=True if 'nolora+' not in training_args.output_dir else False,
+            use_rslora=True if 'norslora' not in training_args.output_dir else False,
         )
     
     model = get_peft_model(model, config)
     print(f"Trainable Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
-    if 'init' in training_args.output_dir:
+    if 'odlora' in training_args.output_dir:
         assert training_args.max_steps > 0
         trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
         trainer.train()

@@ -224,9 +224,9 @@ def train(
             lora_dropout=lora_dropout,
             bias="none",
             task_type="CAUSAL_LM",
-            init_lora_weights=True if 'pissa' not in output_dir else 'pissa_niter_4',
-            use_dora=True if 'dora' in output_dir else False,
-            use_rslora=True if 'nolora+' not in output_dir else False,
+            init_lora_weights=True if 'pissa' not in training_args.output_dir else 'pissa_niter_4',
+            use_dora=True if 'dora' in training_args.output_dir else False,
+            use_rslora=True if 'norslora' not in training_args.output_dir else False,
         )
 
     model = get_peft_model(model, config)
@@ -277,7 +277,7 @@ def train(
         model.is_parallelizable = True
         model.model_parallel = True
 
-    if 'init' in output_dir:
+    if 'odlora' in output_dir:
         assert max_steps > 0
         trainer = Trainer(
             model=model,
@@ -361,6 +361,7 @@ def train(
         "\n If there's a warning about missing keys above, please disregard :)"
     )
 
+    torch.cuda.empty_cache()
     return model, tokenizer, output_dir.split("/")[-2]
 
 
