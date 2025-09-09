@@ -71,6 +71,7 @@ class CustomLoRATrainer(Trainer):
         assert type(self.optimizer) is torch.optim.AdamW, "only support AdamW optimizer"
         self.optimizer = CustomAdamW(
             new_param_groups,
+            total_steps=num_training_steps,
             model=self.model,
             mode=mode,
             before_init=self.args.max_steps > 0
@@ -82,13 +83,14 @@ class CustomLoRATrainer(Trainer):
             self.create_scheduler(num_training_steps=num_training_steps, optimizer=self.optimizer)
 
 class CustomAdamW(torch.optim.AdamW):
-    def __init__(self, params, model=None, mode='base', before_init=False, **kwargs):
+    def __init__(self, params, total_steps, model=None, mode='base', before_init=False, **kwargs):
         super().__init__(params, **kwargs)
         self.model = model
         self._step_count = 0
         self.mode = mode
         self.before_init = before_init
         self.interval = int(self.mode.split('interval')[-1]) if 'interval' in self.mode else 1
+        self.total_steps = total_steps
 
         if hasattr(self.model, 'classifier'):
             self.classifier_params = [p for p in self.model.classifier.parameters() if p.requires_grad]
@@ -188,7 +190,7 @@ class CustomAdamW(torch.optim.AdamW):
                             module.lora_A['default'].weight.data = 0.5 * (torch.diag(s) @ v.T).clone().contiguous()
                             module.lora_B['default'].weight.data = 0.5 * (u @ torch.diag(s)).clone().contiguous()
                             self.state.clear()
-                        elif self._step_count > 10:
+                        elif self._step_count > 10 and self._step_count % (self._step_count // (self.total_steps//5) + 1):
                             if (torch.norm(module.lora_B['default'].weight, dim=0) > 1e-2).all() and (torch.norm(module.lora_A['default'].weight, dim=1) > 1e-2).all():
                                 Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
                                 Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
