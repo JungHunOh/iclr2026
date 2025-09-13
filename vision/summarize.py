@@ -3,11 +3,19 @@ import json
 import glob
 
 #for dataset in ['resisc45', 'cifar100', 'sun397', 'cars', 'dtd', 'cub200', 'food101']:
-for model in ['vit-base']:
+for model in ['vit-large', 'vit-base']:
     for dataset in ['cifar100', 'resisc45', 'food101', 'dtd', 'cub200', 'cars', 'sun397']:
-        methods = ['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']
+        methods = ['base', 'pissa', 'dora', 'odlora', 'norslora']
 
-        rs = [8]
+        rs = [8,16,32]
+
+        if dataset == 'cars' or dataset == 'sun397':
+            lr = 5e-3
+        else:
+            lr = 2e-3
+        
+        if model == 'vit-large':
+            lr *= 0.5
 
         dirs = []
         results = {}
@@ -30,12 +38,16 @@ for model in ['vit-base']:
         for dir in sorted(dirs):
             try:
                 split = dir.split('_')
-                scale, r, method = split[-4:-1]
+                LR, scale, r, method = split[-4:-1]
                 scale = scale.replace('alpha','scale')
-                if float(scale[5:]) not in scales: continue
+                if float(scale[5:]) not in scales:
+                    if method == 'norslora':
+                        scale = 'scale'+str(int(scale[5:]) // int(r.replace('r','')) * 2)
+                    else: continue
                 if method not in methods: continue
                 if int(r.replace('r','')) not in rs: continue
-                if 'bs256' not in dir: continue
+                #if 'bs256' not in dir: continue
+                if abs(float(LR.replace('lr','')) - lr) != 0: continue
             except:
                 continue
             
