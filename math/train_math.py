@@ -347,10 +347,6 @@ def train():
 if __name__ == "__main__":
     model, tokenizer, name = train()
     from eval import gsm8k_test_noargs
-    gsm8k_test_noargs(model, tokenizer, name)
+    gsm8k_test_noargs(model, tokenizer, name, batch_size=100)
     from eval_math import test_hendrycks_math
-    if 'gemma' in name:
-        bs = 200
-    else:
-        bs = 100
-    test_hendrycks_math(model, tokenizer, name, batch_size=bs)
+    test_hendrycks_math(model, tokenizer, name, batch_size=100)
