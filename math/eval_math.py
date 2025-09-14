@@ -111,12 +111,12 @@ def test_hendrycks_math(model, tokenizer, output_dir, start=0, end=MAX_INT, batc
         results.append(res)
 
     acc = sum(results) / len(results)
-    print('len invalid outputs ====', len(invalid_outputs), ', valid_outputs===', invalid_outputs)
+    print('len invalid outputs ====', len(invalid_outputs))
     print('start===', start, ', end====',end)
     print('length====', len(results), ', acc====', acc)
 
     save_path = f"experiment/{output_dir}_math.txt"
     with open(save_path, "w", encoding="utf-8") as f_out:
-        f_out.write('len invalid outputs ====', len(invalid_outputs), ', valid_outputs===', invalid_outputs)
-        f_out.write('length====', len(results), ', acc====', acc)
+        f_out.write(f'len invalid outputs ===={len(invalid_outputs)}')
+        f_out.write(f'length===={len(results)}, acc===={acc}')
     print(f"Results saved to {save_path}")
