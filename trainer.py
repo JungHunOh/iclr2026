@@ -161,8 +161,12 @@ class CustomAdamW(torch.optim.AdamW):
                         v = v[:,:-10]
                         torch.nn.init.zeros_(module.lora_A['default'].weight)
                         torch.nn.init.zeros_(module.lora_B['default'].weight)
-                        module.proj_b = u.clone().contiguous()
-                        module.proj_a = v.T.clone().contiguous()
+                        if 'scaling' in self.mode:
+                            module.proj_b = (u@torch.sqrt(torch.diag(s))).clone().contiguous()
+                            module.proj_a = (torch.sqrt(torch.diag(s))@v.T).clone().contiguous()
+                        else:
+                            module.proj_b = u.clone().contiguous()
+                            module.proj_a = v.T.clone().contiguous()
                         module.do_one = True
                         if hasattr(self.model, 'classifier'):
                             for p, p_init in zip(self.model.classifier.parameters(), self.classifier_params):
@@ -185,10 +189,16 @@ class CustomAdamW(torch.optim.AdamW):
                             u = u[:,:-10]
                             s = s[:-10]
                             v = v[:,:-10]
-                            module.proj_b = u.clone().contiguous()
-                            module.proj_a = v.T.clone().contiguous()
-                            module.lora_A['default'].weight.data = 0.5 * (torch.diag(s) @ v.T).clone().contiguous()
-                            module.lora_B['default'].weight.data = 0.5 * (u @ torch.diag(s)).clone().contiguous()
+                            if 'scaling' in self.mode:
+                                module.proj_b = (0.5**0.5)*(u@torch.sqrt(torch.diag(s))).clone().contiguous()
+                                module.proj_a = (0.5**0.5)*(torch.sqrt(torch.diag(s))@v.T).clone().contiguous()
+                                module.lora_A['default'].weight.data = (0.5**0.5) * (torch.sqrt(torch.diag(s)) @ v.T).clone().contiguous()
+                                module.lora_B['default'].weight.data = (0.5**0.5) * (u @ torch.sqrt(torch.diag(s))).clone().contiguous()
+                            else:
+                                module.proj_b = u.clone().contiguous()
+                                module.proj_a = v.T.clone().contiguous()
+                                module.lora_A['default'].weight.data = 0.5 * (torch.diag(s) @ v.T).clone().contiguous()
+                                module.lora_B['default'].weight.data = 0.5 * (u @ torch.diag(s)).clone().contiguous()
                             self.state.clear()
                         elif self._step_count > 10 and self._step_count % (self._step_count // (self.total_steps//5) + 1)==0:
                             if (torch.norm(module.lora_B['default'].weight, dim=0) > 1e-2).all() and (torch.norm(module.lora_A['default'].weight, dim=1) > 1e-2).all():
