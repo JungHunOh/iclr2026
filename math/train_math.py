@@ -320,8 +320,19 @@ def train():
             use_rslora=True if 'norslora' not in training_args.output_dir else False,
         )
     
-    model = get_peft_model(model, config)
-    print(f"Trainable Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
+    if 'fullft' in training_args.output_dir:
+        for name, param in model.named_parameters():
+            if any(t in name for t in lora_args.target_modules):  # match your modules
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+    else:
+        model = get_peft_model(model, config)
+
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total Parameters: {total_params}")
+    print(f"Trainable Parameters: {trainable_params}, Ratio: {100 * trainable_params / total_params:.2f}%")
 
     if 'odlora' in training_args.output_dir:
         assert training_args.max_steps > 0

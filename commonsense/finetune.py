@@ -229,7 +229,14 @@ def train(
             use_rslora=True if 'norslora' not in output_dir else False,
         )
 
-    model = get_peft_model(model, config)
+    if 'fullft' in output_dir:
+        for name, param in model.named_parameters():
+            if any(t in name for t in target_modules):  # match your modules
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+    else:
+        model = get_peft_model(model, config)
 
     if data_path.endswith(".json"):  # todo: support jsonl
         data = load_dataset("json", data_files=data_path)
@@ -256,7 +263,11 @@ def train(
         else:
             print(f"Checkpoint {checkpoint_name} not found")
 
-    model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
+    #model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total Parameters: {total_params}")
+    print(f"Trainable Parameters: {trainable_params}, Ratio: {100 * trainable_params / total_params:.2f}%")
 
     if val_set_size > 0:
         train_val = data["train"].train_test_split(
@@ -343,15 +354,15 @@ def train(
     )
     model.config.use_cache = False
 
-    old_state_dict = model.state_dict
-    model.state_dict = (
-        lambda self, *_, **__: get_peft_model_state_dict(
-            self, old_state_dict()
-        )
-    ).__get__(model, type(model))
+    # old_state_dict = model.state_dict
+    # model.state_dict = (
+    #     lambda self, *_, **__: get_peft_model_state_dict(
+    #         self, old_state_dict()
+    #     )
+    # ).__get__(model, type(model))
 
-    if torch.__version__ >= "2" and sys.platform != "win32":
-        model = torch.compile(model)
+    # if torch.__version__ >= "2" and sys.platform != "win32":
+    #     model = torch.compile(model)
 
     trainer.train(resume_from_checkpoint=resume_from_checkpoint)
 
