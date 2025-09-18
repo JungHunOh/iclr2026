@@ -1,4 +1,5 @@
 import os
+import random
 
 gpu = input("Enter GPU ID: ")
 
@@ -39,28 +40,36 @@ for model in ['gemma','llama3','llama2']:
                     else:
                         max_steps = -1
 
+                    if 'fullft' in method:
+                        if model == 'llama3':
+                            mini_bs = 1
+                            lr = 1e-5
+                        else:
+                            mini_bs = 4
+                            lr = 2e-5
+                    
+                    num_gpus = len(gpu.split(','))
+
                     output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_bs{bs}_lr{lr}_r{r}_scale{scale}_seed{seed}_{method}_{target_modules_name}"
                     os.makedirs(output_dir, exist_ok=True)
                     # Alpaca finetuning
                     os.system(
-                        f"CUDA_VISIBLE_DEVICES={gpu} "
-                        f"python run_exp.py "
+                        f"CUDA_VISIBLE_DEVICES={gpu} python3 -m torch.distributed.launch --master_port {random.randint(1000,2000)} --nproc_per_node={num_gpus} --use_env run_exp.py "
                         f"--model_name_or_path {base_model} "
                         f"--dataset {dataset} "
-                        f"--bf16 True "
+                        f"--fp16 True "
                         f"--output_dir {output_dir} "
                         f"--num_train_epochs {epoch} "
                         f"--per_device_train_batch_size {mini_bs} "
                         f"--per_device_eval_batch_size {bs} "
-                        f"--gradient_accumulation_steps {bs//mini_bs} "
+                        f"--gradient_accumulation_steps {bs//mini_bs//num_gpus} "
                         f"--eval_strategy 'no' "
                         f"--save_strategy 'no' "
                         f"--learning_rate {lr} "
                         f"--weight_decay 0. "
                         f"--warmup_ratio 0 "
                         f"--lr_scheduler_type 'cosine' "
-                        f"--logging_steps 20 "
-                        f"--tf32 True "
+                        f"--logging_steps 1 "
                         f"--seed {seed} "
                         f"--lora_r {r} "
                         f"--lora_alpha {scale} "

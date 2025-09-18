@@ -1,4 +1,5 @@
 import os
+import random
 
 print('enter gpu')
 gpu=int(input())
@@ -33,9 +34,20 @@ for model in ['gemma','llama3']:
                     max_steps = 50
                 else:
                     max_steps = -1
+                
+                if 'fullft' in method:
+                    if model == 'llama3':
+                        mini_bs = 1
+                        lr = 1e-5
+                    else:
+                        mini_bs = 8
+                        lr = 2e-5
+                    
+                num_gpus = len(gpu.split(','))
+                
                 os.makedirs(f'./trained_models/{model}_{dataset}_lr{lr}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_{method}_seed{seed}/', exist_ok=True)
                 cmd = (
-                    f'CUDA_VISIBLE_DEVICES={gpu} python finetune.py '
+                    f'CUDA_VISIBLE_DEVICES={gpu} python3 -m torch.distributed.launch --master_port {random.randint(1000,2000)} --nproc_per_node={num_gpus} --use_env finetune.py '
                     f'--base_model {base_model} '
                     f'--data_path ./ft-training_set/{dataset}.json '
                     f'--output_dir ./trained_models/{model}_{dataset}_lr{lr}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_{method}_seed{seed}/ '

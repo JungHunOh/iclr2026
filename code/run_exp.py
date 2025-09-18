@@ -245,6 +245,7 @@ def train():
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
+        torch_dtype=torch.float16,
     )
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
@@ -281,8 +282,22 @@ def train():
         use_dora=True if 'dora' in training_args.output_dir else False,
         use_rslora=True if 'norslora' not in training_args.output_dir else False,
     )
-    model = get_peft_model(model, lora_config)
-    model.print_trainable_parameters()
+
+    if 'fullft' in training_args.output_dir:
+        for name, param in model.named_parameters():
+            if any(target in name for target in model_args.target_modules):
+                param.requires_grad = True
+                param.data = param.data.to(torch.float32)
+            else:
+                param.requires_grad = False
+                param.data = param.data.to(torch.float16)
+    else:
+        model = get_peft_model(model, lora_config)
+    
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total Parameters: {total_params}")
+    print(f"Trainable Parameters: {trainable_params}, Ratio: {100 * trainable_params / total_params:.2f}%")
 
     if data_args.dataset == 'codefeedback':
         from datasets import load_dataset
@@ -304,7 +319,7 @@ def train():
     trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
 
     trainer.train()
-    trainer.save_state()
+    #trainer.save_state()
     trainer.save_model(output_dir=training_args.output_dir)
 
     model.eval()

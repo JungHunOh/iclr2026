@@ -282,7 +282,7 @@ def train():
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
         torch_dtype=torch.float16,
-    ).to("cuda")
+    )
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
@@ -320,7 +320,16 @@ def train():
             use_rslora=True if 'norslora' not in training_args.output_dir else False,
         )
     
-    model = get_peft_model(model, config)
+    if 'fullft' in training_args.output_dir:
+        for name, param in model.named_parameters():
+            if any(target in name for target in lora_args.target_modules):
+                param.requires_grad = True
+                param.data = param.data.to(torch.float32)
+            else:
+                param.requires_grad = False
+                param.data = param.data.to(torch.float16)
+    else:
+        model = get_peft_model(model, config)
 
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

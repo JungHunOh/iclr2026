@@ -229,7 +229,16 @@ def train(
             use_rslora=True if 'norslora' not in output_dir else False,
         )
 
-    model = get_peft_model(model, config)
+    if 'fullft' in output_dir:
+        for name, param in model.named_parameters():
+            if any(target in name for target in target_modules):
+                param.requires_grad = True
+                param.data = param.data.to(torch.float32)
+            else:
+                param.requires_grad = False
+                param.data = param.data.to(torch.float16)
+    else:
+        model = get_peft_model(model, config)
 
     if data_path.endswith(".json"):  # todo: support jsonl
         data = load_dataset("json", data_files=data_path)
@@ -294,7 +303,7 @@ def train(
                 num_train_epochs=num_epochs,
                 learning_rate=learning_rate,
                 fp16=True,
-                logging_steps=20,
+                logging_steps=1,
                 optim="adamw_torch",
                 eval_strategy="epoch" if val_set_size > 0 else "no",
                 save_strategy="no",
@@ -328,7 +337,7 @@ def train(
             num_train_epochs=num_epochs,
             learning_rate=learning_rate,
             fp16=True,
-            logging_steps=20,
+            logging_steps=1,
             optim="adamw_torch",
             eval_strategy="epoch" if val_set_size > 0 else "no",
             save_strategy="no",

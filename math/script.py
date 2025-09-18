@@ -1,4 +1,5 @@
 import os
+import random
 
 print('PID:', os.getpid())
 
@@ -48,22 +49,32 @@ for model in ['gemma','llama3']:
                     else:
                         max_steps = -1
                     
+                    if 'fullft' in method:
+                        if model == 'llama3':
+                            mini_bs = 1
+                            lr = 1e-5
+                        else:
+                            mini_bs = 8
+                            lr = 2e-5
+                    
+                    num_gpus = len(gpu.split(','))
+                    
                     os.makedirs(f'./trained_models/{model}_{dataset}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_lr{lr}_seed{seed}_{method}_{target_modules_name}/', exist_ok=True)
-                    os.system(f'CUDA_VISIBLE_DEVICES={gpu} python train_math.py \
+                    os.system(f'CUDA_VISIBLE_DEVICES={gpu} python3 -m torch.distributed.launch --master_port {random.randint(1000,2000)}  --nproc_per_node={num_gpus} --use_env train_math.py \
                         --model_name_or_path {base_model}\
                         --data_path ft-training_set/{dataset_name}.json \
                         --data_length 100000 \
-                        --bf16 True \
+                        --fp16 True \
                         --output_dir ./trained_models/{model}_{dataset}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_lr{lr}_seed{seed}_{method}_{target_modules_name}/\
                         --per_device_train_batch_size {mini_bs} \
                         --per_device_eval_batch_size 4 \
-                        --gradient_accumulation_steps {bs//mini_bs} \
+                        --gradient_accumulation_steps {bs//mini_bs//num_gpus} \
                         --evaluation_strategy "no" \
                         --save_strategy "no" \
                         --learning_rate {lr}\
                         --weight_decay 0 \
                         --warmup_ratio 0 \
-                        --logging_steps 20 \
+                        --logging_steps 1 \
                         --max_steps {max_steps} \
                         --num_train_epochs {epoch} \
                         --lr_scheduler_type "cosine" \
