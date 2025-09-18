@@ -2,7 +2,7 @@ import os
 import random
 
 print('enter gpu')
-gpu=int(input())
+gpu=input()
 
 dataset='commonsense_170k'
 
@@ -44,6 +44,9 @@ for model in ['gemma','llama3']:
                         lr = 2e-5
                     
                 num_gpus = len(gpu.split(','))
+
+                if num_gpus > 1 and num_gpus * mini_bs >= bs:
+                    mini_bs = bs // num_gpus
                 
                 os.makedirs(f'./trained_models/{model}_{dataset}_lr{lr}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_{method}_seed{seed}/', exist_ok=True)
                 cmd = (
