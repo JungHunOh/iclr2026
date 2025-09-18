@@ -229,14 +229,7 @@ def train(
             use_rslora=True if 'norslora' not in output_dir else False,
         )
 
-    if 'fullft' in output_dir:
-        for name, param in model.named_parameters():
-            if any(t in name for t in target_modules):  # match your modules
-                param.requires_grad = True
-            else:
-                param.requires_grad = False
-    else:
-        model = get_peft_model(model, config)
+    model = get_peft_model(model, config)
 
     if data_path.endswith(".json"):  # todo: support jsonl
         data = load_dataset("json", data_files=data_path)
