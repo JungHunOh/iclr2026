@@ -359,8 +359,12 @@ def train():
 
 if __name__ == "__main__":
     model, tokenizer, name = train()
-    from eval import gsm8k_test_noargs
-    gsm8k_test_noargs(model, tokenizer, name, batch_size=100)
-    if 'llama2' not in name:
-        from eval_math import test_hendrycks_math
-        test_hendrycks_math(model, tokenizer, name, batch_size=100)
+    import torch.distributed as dist
+    if dist.get_rank() != 0:
+        exit(0)
+    else:
+        from eval import gsm8k_test_noargs
+        gsm8k_test_noargs(model, tokenizer, name, batch_size=100)
+        if 'llama2' not in name:
+            from eval_math import test_hendrycks_math
+            test_hendrycks_math(model, tokenizer, name, batch_size=100)

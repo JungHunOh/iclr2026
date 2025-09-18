@@ -322,21 +322,25 @@ def train():
     #trainer.save_state()
     trainer.save_model(output_dir=training_args.output_dir)
 
-    model.eval()
+    import torch.distributed as dist
+    if dist.get_rank() != 0:
+        exit(0)
+    else:
+        model.eval()
 
-    if data_args.dataset == 'codefeedback':
-        from eval_humaneval import main as eval_humaneval
-        import os
-        eval_humaneval(model, tokenizer, training_args.output_dir.split('/')[-1])
+        if data_args.dataset == 'codefeedback':
+            from eval_humaneval import main as eval_humaneval
+            import os
+            eval_humaneval(model, tokenizer, training_args.output_dir.split('/')[-1])
 
-        dir = os.path.join(training_args.output_dir, "humaneval_samples.jsonl")
+            dir = os.path.join(training_args.output_dir, "humaneval_samples.jsonl")
 
-        os.system(f"python eval_human.py {dir}")
-    elif data_args.dataset == "alpaca":
-        #import eval_mmlu
-        #eval_mmlu.main(model, tokenizer, training_args.output_dir)
-        from alpaca_eval import eval
-        eval(model, tokenizer, training_args.output_dir)
+            os.system(f"python eval_human.py {dir}")
+        elif data_args.dataset == "alpaca":
+            #import eval_mmlu
+            #eval_mmlu.main(model, tokenizer, training_args.output_dir)
+            from alpaca_eval import eval
+            eval(model, tokenizer, training_args.output_dir)
 
 if __name__ == "__main__":
     train()

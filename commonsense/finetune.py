@@ -403,5 +403,9 @@ def generate_prompt(data_point):
 
 if __name__ == "__main__":
     model, tokenizer, name = fire.Fire(train)
-    from commonsense_evaluate import eval
-    eval(model, tokenizer, name)
+    import torch.distributed as dist
+    if dist.get_rank() != 0:
+        exit(0)
+    else:
+        from commonsense_evaluate import eval
+        eval(model, tokenizer, name)
