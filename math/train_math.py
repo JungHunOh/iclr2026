@@ -308,6 +308,9 @@ def train():
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
 
+    if 'norslora' in training_args.output_dir:
+        lora_args.lora_alpha = lora_args.lora_r * 2
+
     config = LoraConfig(
             r=lora_args.lora_r,
             lora_alpha=lora_args.lora_alpha,

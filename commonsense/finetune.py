@@ -217,6 +217,9 @@ def train(
 
     #model = prepare_model_for_int8_training(model, use_gradient_checkpointing=use_gradient_checkpointing)
     if adapter_name == "lora":
+        if 'norslora' in output_dir:
+            lora_alpha = lora_r * 2
+
         config = LoraConfig(
             r=lora_r,
             lora_alpha=lora_alpha,

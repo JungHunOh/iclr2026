@@ -271,6 +271,9 @@ def train():
         model=model,
     )
 
+    if 'norslora' in training_args.output_dir:
+        model_args.lora_alpha = model_args.lora_r * 2
+
     lora_config = LoraConfig(
         r=model_args.lora_r,
         lora_alpha=model_args.lora_alpha,
