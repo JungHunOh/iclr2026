@@ -293,7 +293,7 @@ def train(
         model.is_parallelizable = True
         model.model_parallel = True
 
-    if 'odlora' in output_dir:
+    if 'odlora' in output_dir or 'lorauniform' in output_dir:
         assert max_steps > 0
         trainer = Trainer(
             model=model,

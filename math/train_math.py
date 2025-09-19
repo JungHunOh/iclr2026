@@ -339,7 +339,7 @@ def train():
     print(f"Total Parameters: {total_params}")
     print(f"Trainable Parameters: {trainable_params}, Ratio: {100 * trainable_params / total_params:.2f}%")
 
-    if 'odlora' in training_args.output_dir:
+    if 'odlora' in training_args.output_dir or 'lorauniform' in training_args.output_dir:
         assert training_args.max_steps > 0
         trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
         trainer.train()

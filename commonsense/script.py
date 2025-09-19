@@ -30,7 +30,7 @@ for model in ['gemma','llama3']:
         #for method in ['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']:
         for method in ['base','odlora']:
             for r in [32]:
-                if 'odlora' in method:
+                if 'odlora' in method or 'lorauniform' in method:
                     max_steps = 50
                 else:
                     max_steps = -1
@@ -38,15 +38,15 @@ for model in ['gemma','llama3']:
                 if 'fullft' in method:
                     if model == 'llama3':
                         mini_bs = 1
-                        lr = 1e-5
+                        lr = 5e-6
                     else:
                         mini_bs = 8
-                        lr = 2e-5
+                        lr = 1e-5
                     
                 num_gpus = len(gpu.split(','))
 
-                if num_gpus > 1 and num_gpus * mini_bs >= bs:
-                    mini_bs = bs // num_gpus
+                if num_gpus * mini_bs > bs:
+                        mini_bs = bs // num_gpus
                 
                 os.makedirs(f'./trained_models/{model}_{dataset}_lr{lr}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_{method}_seed{seed}/', exist_ok=True)
                 cmd = (

@@ -35,7 +35,7 @@ for model in ['gemma','llama3','llama2']:
                 
                 #['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']
                 for method in ['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']:
-                    if 'odlora' in method:
+                    if 'odlora' in method or 'lorauniform' in method:
                         max_steps = 50
                     else:
                         max_steps = -1
@@ -49,6 +49,9 @@ for model in ['gemma','llama3','llama2']:
                             lr = 2e-5
                     
                     num_gpus = len(gpu.split(','))
+
+                    if num_gpus * mini_bs > bs:
+                        mini_bs = bs // num_gpus
 
                     output_dir = f"./experiment/{dataset}/{model}_epoch{epoch}_bs{bs}_lr{lr}_r{r}_scale{scale}_seed{seed}_{method}_{target_modules_name}"
                     os.makedirs(output_dir, exist_ok=True)

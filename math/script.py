@@ -44,7 +44,7 @@ for model in ['gemma','llama3']:
                             mini_bs=8
                         else:
                             mini_bs=16
-                    if 'odlora' in method:
+                    if 'odlora' in method or 'lorauniform' in method:
                         max_steps = 50
                     else:
                         max_steps = -1
@@ -52,12 +52,15 @@ for model in ['gemma','llama3']:
                     if 'fullft' in method:
                         if model == 'llama3':
                             mini_bs = 1
-                            lr = 1e-5
+                            lr = 5e-6
                         else:
                             mini_bs = 8
-                            lr = 2e-5
+                            lr = 1e-5
                     
                     num_gpus = len(gpu.split(','))
+
+                    if num_gpus * mini_bs > bs:
+                        mini_bs = bs // num_gpus
                     
                     os.makedirs(f'./trained_models/{model}_{dataset}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_lr{lr}_seed{seed}_{method}_{target_modules_name}/', exist_ok=True)
                     os.system(f'CUDA_VISIBLE_DEVICES={gpu} python3 -m torch.distributed.launch --master_port {random.randint(1000,2000)}  --nproc_per_node={num_gpus} --use_env train_math.py \
