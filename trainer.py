@@ -103,7 +103,7 @@ class CustomAdamW(torch.optim.AdamW):
                 if not hasattr(module, 'layer_idx'):
                     module.layer_idx = layer
                     layer += 1
-                if not self.before_init and ('init' in self.mode or 'odlora' in self.mode):
+                if not self.before_init and ('lorauniform' in self.mode or 'odlora' in self.mode):
                     if self.mode == 'oursnewinitnoproj':
                         module.lora_B['default'].weight.data = module.detached_b.clone().contiguous()
                         module.lora_A['default'].weight.data = module.detached_a.clone().contiguous()
@@ -113,6 +113,9 @@ class CustomAdamW(torch.optim.AdamW):
                         module.do_one = True
                         torch.nn.init.zeros_(module.lora_A['default'].weight)
                         torch.nn.init.zeros_(module.lora_B['default'].weight)
+                    elif 'lorauniform' in self.mode:
+                        module.lora_B['default'].weight.data = module.detached_b.clone().contiguous()
+                        module.lora_A['default'].weight.data = module.detached_a.clone().contiguous()
                     else:
                         module.proj_a = module.detached_a.clone().contiguous()
                         module.proj_b = module.detached_b.clone().contiguous()
@@ -152,22 +155,28 @@ class CustomAdamW(torch.optim.AdamW):
                     with torch.no_grad():
                         lora_A = module.lora_A['default'].weight
                         lora_B = module.lora_B['default'].weight
-                        if hasattr(module, 'proj_a') and hasattr(module, 'proj_b'):
+                        if hasattr(module, 'proj_a') and hasattr(module, 'proj_b') and 'lorauniform' not in self.mode:
                             u, s, v = torch.svd_lowrank(lora_B @ module.proj_a + module.proj_b @ lora_A, q=module.lora_A['default'].weight.shape[0]+10, niter=4)
                         else:
                             u, s, v = torch.svd_lowrank(lora_B @ lora_A, q=module.lora_A['default'].weight.shape[0]+10, niter=4)
                         u = u[:,:-10]
                         s = s[:-10]
                         v = v[:,:-10]
-                        torch.nn.init.zeros_(module.lora_A['default'].weight)
-                        torch.nn.init.zeros_(module.lora_B['default'].weight)
-                        if 'scaling' in self.mode:
-                            module.proj_b = (u@torch.sqrt(torch.diag(s))).clone().contiguous()
-                            module.proj_a = (torch.sqrt(torch.diag(s))@v.T).clone().contiguous()
+                        if 'lorauniform' in self.mode:
+                            lora_B.data = u.clone().contiguous()
+                            lora_A.data = v.T.clone().contiguous()
+                            module.detached_a = v.T.clone().contiguous()
+                            module.detached_b = u.clone().contiguous()
                         else:
-                            module.proj_b = u.clone().contiguous()
-                            module.proj_a = v.T.clone().contiguous()
-                        module.do_one = True
+                            torch.nn.init.zeros_(module.lora_A['default'].weight)
+                            torch.nn.init.zeros_(module.lora_B['default'].weight)
+                            if 'scaling' in self.mode:
+                                module.proj_b = (u@torch.sqrt(torch.diag(s))).clone().contiguous()
+                                module.proj_a = (torch.sqrt(torch.diag(s))@v.T).clone().contiguous()
+                            else:
+                                module.proj_b = u.clone().contiguous()
+                                module.proj_a = v.T.clone().contiguous()
+                            module.do_one = True
                         if hasattr(self.model, 'classifier'):
                             for p, p_init in zip(self.model.classifier.parameters(), self.classifier_params):
                                 if p.requires_grad:
@@ -177,6 +186,16 @@ class CustomAdamW(torch.optim.AdamW):
                                 if p.requires_grad:
                                     p.data = p_init.data.clone().contiguous()
                         self.state.clear()
+
+        if not self.before_init and 'lorauniform' in self.mode:
+            for module in self.model.modules():
+                if hasattr(module, 'lora_A'):
+                    lora_A = module.lora_A['default'].weight
+                    lora_B = module.lora_B['default'].weight
+                    Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
+                    Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
+                    module.lora_A['default'].weight.data = (Q_A * torch.sign(torch.diag(R_A))).T.clone().contiguous()
+                    module.lora_B['default'].weight.data = (Q_B * torch.sign(torch.diag(R_B))).clone().contiguous()
 
         if not self.before_init and 'odlora' in self.mode and self._step_count % self.interval == 0:
             for module in self.model.modules():
