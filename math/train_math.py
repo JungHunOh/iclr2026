@@ -281,7 +281,7 @@ def train():
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
     )
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(
@@ -323,16 +323,13 @@ def train():
             use_rslora=True if 'norslora' not in training_args.output_dir else False,
         )
     
+    model = get_peft_model(model, config)
     if 'fullft' in training_args.output_dir:
         for name, param in model.named_parameters():
             if any(target in name for target in lora_args.target_modules):
                 param.requires_grad = True
-                param.data = param.data.to(torch.float32)
             else:
                 param.requires_grad = False
-                param.data = param.data.to(torch.float16)
-    else:
-        model = get_peft_model(model, config)
 
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -357,6 +354,38 @@ def train():
         param.data = param.data.contiguous()
     model.save_pretrained(training_args.output_dir)
     tokenizer.save_pretrained(training_args.output_dir)
+
+    import torch.distributed as dist
+    if dist.get_rank() != 0:
+        exit(0)
+    if False:
+        model_tmp = transformers.AutoModelForCausalLM.from_pretrained(
+            model_args.model_name_or_path,
+            cache_dir=training_args.cache_dir,
+            torch_dtype=torch.float16,
+        )
+        model_tmp = get_peft_model(model_tmp, config)
+
+        with open(f'{training_args.output_dir}/singular_values.json', 'a') as f:
+            f.write('#############################################\n')
+
+        for module, module_tmp in zip(model.modules(), model_tmp.modules()):
+            if hasattr(module, 'lora_A'):
+                if 'fullft' in training_args.output_dir:
+                    delta = module.base_layer.weight.data - module_tmp.base_layer.weight.data.cuda()
+                else:
+                    lora_a = module.lora_A['default'].weight.data.contiguous()
+                    lora_b = module.lora_B['default'].weight.data.contiguous()
+                    if 'base' in training_args.output_dir:
+                        delta = lora_b @ lora_a * module.scaling['default']
+                    elif 'odlora' in training_args.output_dir:
+                        delta = (lora_b @ module.proj_a + module.proj_b @ lora_a) * module.scaling['default']
+                
+                _, S, _ = torch.svd_lowrank(delta.to(torch.float32), q=lora_args.lora_r+20, niter=4)
+                S = S[:-20]
+                with open(f'{training_args.output_dir}/singular_values.json', 'a') as f:
+                    json.dump(S.cpu().numpy().tolist(), f)
+                    f.write('\n')
 
     return model, tokenizer, training_args.output_dir.split('/')[-2]
 

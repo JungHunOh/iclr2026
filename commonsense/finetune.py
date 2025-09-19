@@ -153,8 +153,7 @@ def train(
         model = AutoModelForCausalLM.from_pretrained(
             base_model,
             load_in_8bit=False,
-            torch_dtype=torch.float16,
-            device_map={"": int(os.environ.get("LOCAL_RANK") or 0)},
+            torch_dtype=torch.bfloat16,
             trust_remote_code=True,
         )
 
@@ -232,16 +231,13 @@ def train(
             use_rslora=True if 'norslora' not in output_dir else False,
         )
 
+    model = get_peft_model(model, config)
     if 'fullft' in output_dir:
         for name, param in model.named_parameters():
             if any(target in name for target in target_modules):
                 param.requires_grad = True
-                param.data = param.data.to(torch.float32)
             else:
                 param.requires_grad = False
-                param.data = param.data.to(torch.float16)
-    else:
-        model = get_peft_model(model, config)
 
     if data_path.endswith(".json"):  # todo: support jsonl
         data = load_dataset("json", data_files=data_path)
@@ -305,7 +301,8 @@ def train(
                 warmup_steps=0,
                 num_train_epochs=num_epochs,
                 learning_rate=learning_rate,
-                fp16=True,
+                fp16=False,
+                bf16=True,
                 logging_steps=1,
                 optim="adamw_torch",
                 eval_strategy="epoch" if val_set_size > 0 else "no",
@@ -339,7 +336,8 @@ def train(
             warmup_steps=0,
             num_train_epochs=num_epochs,
             learning_rate=learning_rate,
-            fp16=True,
+            fp16=False,
+            bf16=True,
             logging_steps=1,
             optim="adamw_torch",
             eval_strategy="epoch" if val_set_size > 0 else "no",
@@ -378,6 +376,40 @@ def train(
     )
 
     torch.cuda.empty_cache()
+
+    import torch.distributed as dist
+    if dist.get_rank() != 0:
+        exit(0)
+    if False:
+        model_tmp = AutoModelForCausalLM.from_pretrained(
+            base_model,
+            load_in_8bit=False,
+            torch_dtype=torch.bfloat16,
+            trust_remote_code=True,
+        )
+        model_tmp = get_peft_model(model_tmp, config)
+
+        with open(f'{output_dir}/singular_values.json', 'a') as f:
+            f.write('#############################################\n')
+
+        for module, module_tmp in zip(model.modules(), model_tmp.modules()):
+            if hasattr(module, 'lora_A'):
+                if 'fullft' in output_dir:
+                    delta = module.base_layer.weight.data - module_tmp.base_layer.weight.data.cuda()
+                else:
+                    lora_a = module.lora_A['default'].weight.data.contiguous()
+                    lora_b = module.lora_B['default'].weight.data.contiguous()
+                    if 'base' in output_dir:
+                        delta = lora_b @ lora_a * module.scaling['default']
+                    elif 'odlora' in output_dir:
+                        delta = (lora_b @ module.proj_a + module.proj_b @ lora_a) * module.scaling['default']
+                
+                _, S, _ = torch.svd_lowrank(delta.to(torch.float32), q=lora_r+20, niter=4)
+                S = S[:-20]
+                with open(f'{output_dir}/singular_values.json', 'a') as f:
+                    json.dump(S.cpu().numpy().tolist(), f)
+                    f.write('\n')
+
     return model, tokenizer, output_dir.split("/")[-2]
 
 

@@ -7,7 +7,7 @@ gpu=input()
 dataset='commonsense_170k'
 
 
-for model in ['gemma','llama3']:
+for model in ['llama3','gemma']:
 
     if model == 'gemma':
         base_model = 'google/gemma-2b'
@@ -26,9 +26,9 @@ for model in ['gemma','llama3']:
 
     target_modules=["q_proj", "k_proj", "v_proj", "down_proj", "up_proj", "gate_proj", "o_proj"]
 
-    for seed in [1,2,3]:
+    for seed in [1]:
         #for method in ['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']:
-        for method in ['base','odlora']:
+        for method in ['base','fullft', 'odlora', 'odlorascaling']:
             for r in [32]:
                 if 'odlora' in method or 'lorauniform' in method:
                     max_steps = 50

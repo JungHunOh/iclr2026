@@ -3,7 +3,7 @@ import random
 
 gpu = input("Enter GPU ID: ")
 
-for model in ['gemma','llama3','llama2']:
+for model in ['llama3','gemma']:
 
     if model == 'gemma':
         base_model = 'google/gemma-2b'
@@ -28,13 +28,13 @@ for model in ['gemma','llama3','llama2']:
         lr = 2e-4
 
     scale = 4
-    for seed in [1,2,3]:
-        for r in [8,32]:
+    for seed in [1]:
+        for r in [32]:
             for target_modules in ['q_proj k_proj v_proj down_proj up_proj gate_proj o_proj']:
                 target_modules_name = target_modules.replace(' ', '').replace('_proj','')
                 
                 #['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']
-                for method in ['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']:
+                for method in ['base', 'fullft', 'odlora', 'odlorascaling']:
                     if 'odlora' in method or 'lorauniform' in method:
                         max_steps = 50
                     else:
@@ -43,10 +43,10 @@ for model in ['gemma','llama3','llama2']:
                     if 'fullft' in method:
                         if model == 'llama3':
                             mini_bs = 1
-                            lr = 1e-5
+                            lr = 5e-6
                         else:
                             mini_bs = 4
-                            lr = 2e-5
+                            lr = 1e-5
                     
                     num_gpus = len(gpu.split(','))
 
@@ -60,7 +60,8 @@ for model in ['gemma','llama3','llama2']:
                         f"CUDA_VISIBLE_DEVICES={gpu} python3 -m torch.distributed.launch --master_port {random.randint(1000,2000)} --nproc_per_node={num_gpus} --use_env run_exp.py "
                         f"--model_name_or_path {base_model} "
                         f"--dataset {dataset} "
-                        f"--fp16 True "
+                        f"--fp16 False "
+                        f"--bf16 True "
                         f"--output_dir {output_dir} "
                         f"--num_train_epochs {epoch} "
                         f"--per_device_train_batch_size {mini_bs} "

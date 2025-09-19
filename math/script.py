@@ -6,7 +6,7 @@ print('PID:', os.getpid())
 print('enter gpu')
 gpu=input()
 
-for model in ['gemma','llama3']:
+for model in ['llama3','gemma']:
 
     if model == 'gemma':
         base_model = 'google/gemma-2b'
@@ -28,11 +28,11 @@ for model in ['gemma','llama3']:
         lr = 2e-4
 
     epoch=1
-    for seed in [1,2,3]:
+    for seed in [1]:
         for target_modules in ['q_proj k_proj v_proj down_proj up_proj o_proj gate_proj']:
             target_modules_name = target_modules.replace(' ', '').replace('_proj','')
-            for r, scale in [(32,4),(8,4)]:
-                for method in ['base', 'pissa', 'dora', 'odlora', 'norslora', 'lora+']:
+            for r, scale in [(32,4)]:
+                for method in ['base', 'fullft', 'odlora', 'odlorascaling']:
                 #for method in ['odlora']:
                     if 'dora' in method:
                         if model == 'llama3':
@@ -67,7 +67,8 @@ for model in ['gemma','llama3']:
                         --model_name_or_path {base_model}\
                         --data_path ft-training_set/{dataset_name}.json \
                         --data_length 100000 \
-                        --fp16 True \
+                        --bf16 True \
+                        --fp16 False \
                         --output_dir ./trained_models/{model}_{dataset}_epoch{epoch}_bs{bs}_r{r}_scale{scale}_lr{lr}_seed{seed}_{method}_{target_modules_name}/\
                         --per_device_train_batch_size {mini_bs} \
                         --per_device_eval_batch_size 4 \
