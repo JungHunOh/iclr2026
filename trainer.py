@@ -190,12 +190,13 @@ class CustomAdamW(torch.optim.AdamW):
         if not self.before_init and 'lorauniform' in self.mode:
             for module in self.model.modules():
                 if hasattr(module, 'lora_A'):
-                    lora_A = module.lora_A['default'].weight
-                    lora_B = module.lora_B['default'].weight
-                    Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
-                    Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
-                    module.lora_A['default'].weight.data = (Q_A * torch.sign(torch.diag(R_A))).T.clone().contiguous()
-                    module.lora_B['default'].weight.data = (Q_B * torch.sign(torch.diag(R_B))).clone().contiguous()
+                    with torch.no_grad():
+                        lora_A = module.lora_A['default'].weight
+                        lora_B = module.lora_B['default'].weight
+                        Q_A, R_A = torch.linalg.qr(lora_A.T, mode='reduced')
+                        Q_B, R_B = torch.linalg.qr(lora_B, mode='reduced')
+                        module.lora_A['default'].weight.data = (Q_A * torch.sign(torch.diag(R_A))).T.clone().contiguous()
+                        module.lora_B['default'].weight.data = (Q_B * torch.sign(torch.diag(R_B))).clone().contiguous()
 
         if not self.before_init and 'odlora' in self.mode and self._step_count % self.interval == 0:
             for module in self.model.modules():
